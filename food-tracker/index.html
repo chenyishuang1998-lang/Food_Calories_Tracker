@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="今天吃啥" />
+  <meta name="description" content="记录每天吃啥，轻松追踪卡路里" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <title>今天吃啥</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface2: #334155;
+      --border: rgba(255,255,255,0.08);
+      --accent: #38bdf8;
+      --accent2: #818cf8;
+      --danger: #f87171;
+      --success: #4ade80;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      font-family: 'Noto Sans SC', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* Header */
+    .header {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(15,23,42,0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .header-title { font-size: 18px; font-weight: 700; }
+    .header-title span { color: var(--accent); }
+    .date-nav { display: flex; align-items: center; gap: 8px; }
+    .date-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--muted);
+      width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 16px; transition: all 0.15s;
+    }
+    .date-btn:hover { background: var(--surface2); color: var(--text); }
+    .date-label { font-size: 13px; color: var(--muted); min-width: 52px; text-align: center; }
+
+    /* Main */
+    .main { padding: 20px; max-width: 600px; margin: 0 auto; }
+
+    /* Stats ring */
+    .stats-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+      display: flex; align-items: center; gap: 20px;
+    }
+    .ring-wrap { position: relative; width: 90px; height: 90px; flex-shrink: 0; }
+    .ring-wrap svg { transform: rotate(-90deg); }
+    .ring-bg { fill: none; stroke: var(--surface2); stroke-width: 8; }
+    .ring-fill { fill: none; stroke-width: 8; stroke-linecap: round; transition: stroke-dashoffset 0.6s ease; }
+    .ring-center {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+    }
+    .ring-cal { font-size: 18px; font-weight: 700; }
+    .ring-label { font-size: 10px; color: var(--muted); }
+    .stats-info { flex: 1; }
+    .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stat-box { background: var(--surface2); border-radius: var(--radius-sm); padding: 10px 12px; }
+    .stat-box .s-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+    .stat-box .s-value { font-size: 20px; font-weight: 700; }
+    .stat-box .s-unit { font-size: 11px; color: var(--muted); }
+    .s-value.ok { color: var(--success); }
+    .s-value.over { color: var(--danger); }
+    .s-value.accent { color: var(--accent); }
+
+    /* Meal sections */
+    .meal-section { margin-bottom: 12px; }
+    .meal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 4px;
+      cursor: pointer;
+    }
+    .meal-header-left { display: flex; align-items: center; gap: 8px; }
+    .meal-icon { font-size: 18px; }
+    .meal-name { font-size: 14px; font-weight: 500; }
+    .meal-subtotal { font-size: 12px; color: var(--muted); }
+    .meal-toggle { font-size: 12px; color: var(--muted); transition: transform 0.2s; }
+    .meal-toggle.open { transform: rotate(180deg); }
+
+    .meal-body {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .food-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      animation: fadeIn 0.2s ease;
+    }
+    .food-item:last-child { border-bottom: none; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+    .food-emoji { font-size: 20px; min-width: 28px; text-align: center; }
+    .food-name { flex: 1; font-size: 14px; }
+    .food-cal { font-size: 13px; color: var(--accent); font-weight: 500; min-width: 60px; text-align: right; }
+    .food-del {
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); font-size: 16px; padding: 2px 4px;
+      transition: color 0.15s;
+    }
+    .food-del:hover { color: var(--danger); }
+    .empty-meal { padding: 14px; font-size: 13px; color: var(--muted); text-align: center; }
+
+    /* Add form */
+    .add-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-top: 8px;
+    }
+    .add-title { font-size: 14px; font-weight: 500; margin-bottom: 12px; color: var(--muted); }
+    .form-grid { display: grid; grid-template-columns: 1fr 90px; gap: 8px; margin-bottom: 8px; }
+    .form-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+    input, select {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text);
+      font-family: inherit; font-size: 14px;
+      padding: 10px 12px; width: 100%;
+      outline: none; transition: border-color 0.15s;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+    input::placeholder { color: var(--muted); }
+    select option { background: var(--surface2); }
+
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .btn {
+      border: none; border-radius: var(--radius-sm);
+      padding: 11px; font-family: inherit; font-size: 14px; font-weight: 500;
+      cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-primary { background: var(--accent); color: #0f172a; }
+    .btn-primary:hover { filter: brightness(1.1); }
+    .btn-ai { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-ai:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    /* Photo button */
+    .photo-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      background: linear-gradient(135deg, #1e293b, #334155);
+      border: 1px dashed rgba(56,189,248,0.4);
+      border-radius: var(--radius); padding: 14px;
+      cursor: pointer; color: var(--accent); font-size: 14px; font-weight: 500;
+      width: 100%; font-family: inherit;
+      transition: all 0.15s; margin-bottom: 12px;
+    }
+    .photo-btn:hover { border-color: var(--accent); background: rgba(56,189,248,0.05); }
+    #photoInput { display: none; }
+
+    /* Loading spinner */
+    .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(56,189,248,0.3); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+      background: var(--surface2); color: var(--text);
+      padding: 10px 20px; border-radius: 99px; font-size: 13px;
+      border: 1px solid var(--border); z-index: 999;
+      animation: toastIn 0.2s ease;
+      white-space: nowrap;
+    }
+    @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+    /* API Key setup */
+    .apikey-banner {
+      background: rgba(129,140,248,0.1);
+      border: 1px solid rgba(129,140,248,0.3);
+      border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px;
+      font-size: 13px; color: var(--muted);
+    }
+    .apikey-banner strong { color: var(--accent2); }
+    .apikey-row { display: flex; gap: 8px; margin-top: 8px; }
+    .apikey-row input { font-size: 12px; font-family: monospace; }
+    .btn-save-key { background: var(--accent2); color: white; border: none; border-radius: var(--radius-sm); padding: 0 14px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+
+    @media (max-width: 400px) {
+      .main { padding: 12px; }
+      .stats-card { flex-direction: column; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">今天<span>吃啥</span></div>
+  <div class="date-nav">
+    <button class="date-btn" onclick="changeDay(-1)">‹</button>
+    <span class="date-label" id="dateLabel">今天</span>
+    <button class="date-btn" onclick="changeDay(1)">›</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- API Key banner -->
+  <div class="apikey-banner" id="apiBanner">
+    <strong>🔑 填入 Anthropic API Key</strong>，解锁 AI 拍照识别功能
+    <div class="apikey-row">
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." />
+      <button class="btn-save-key" onclick="saveApiKey()">保存</button>
+    </div>
+    <div style="margin-top:6px;font-size:11px">Key 只存在你的手机本地，不会上传。获取：<a href="https://console.anthropic.com" target="_blank" style="color:var(--accent2)">console.anthropic.com</a></div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-card">
+    <div class="ring-wrap">
+      <svg width="90" height="90" viewBox="0 0 90 90">
+        <circle class="ring-bg" cx="45" cy="45" r="37" />
+        <circle class="ring-fill" id="ringFill" cx="45" cy="45" r="37"
+          stroke-dasharray="232.5" stroke-dashoffset="232.5" />
+      </svg>
+      <div class="ring-center">
+        <span class="ring-cal" id="ringCal">0</span>
+        <span class="ring-label">千卡</span>
+      </div>
+    </div>
+    <div class="stats-info">
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="s-label">目标</div>
+          <div class="s-value accent" id="goalVal">2000</div>
+          <div class="s-unit">千卡</div>
+        </div>
+        <div class="stat-box">
+          <div class="s-label">剩余</div>
+          <div class="s-value" id="remainVal">2000</div>
+          <div class="s-unit">千卡</div>
+        </div>
+        <div class="stat-box">
+          <div class="s-label">食物</div>
+          <div class="s-value accent" id="countVal">0</div>
+          <div class="s-unit">种</div>
+        </div>
+        <div class="stat-box">
+          <div class="s-label">完成度</div>
+          <div class="s-value" id="pctVal">0%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Meals -->
+  <div id="mealsContainer"></div>
+
+  <!-- Add form -->
+  <div class="add-card">
+    <div class="add-title">＋ 添加食物</div>
+
+    <!-- Photo upload -->
+    <input type="file" id="photoInput" accept="image/*" capture="environment" onchange="handlePhoto(event)" />
+    <button class="photo-btn" onclick="document.getElementById('photoInput').click()" id="photoBtn">
+      <span id="photoBtnContent">📷 拍照 / 上传图片，AI 自动识别卡路里</span>
+    </button>
+
+    <div class="form-grid">
+      <input type="text" id="foodName" placeholder="食物名称，例：米饭、鸡腿" />
+      <input type="number" id="foodCal" placeholder="千卡" min="0" />
+    </div>
+    <div class="form-grid2">
+      <select id="mealType">
+        <option value="breakfast">🌅 早餐</option>
+        <option value="lunch" selected>☀️ 午餐</option>
+        <option value="dinner">🌙 晚餐</option>
+        <option value="snack">🍪 零食</option>
+      </select>
+      <select id="goalInput" onchange="updateGoal(this.value)">
+        <option value="1500">目标 1500 千卡</option>
+        <option value="1800">目标 1800 千卡</option>
+        <option value="2000" selected>目标 2000 千卡</option>
+        <option value="2200">目标 2200 千卡</option>
+        <option value="2500">目标 2500 千卡</option>
+      </select>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="addFood()">✓ 添加</button>
+      <button class="btn btn-ai" onclick="askAI()">✨ 让 AI 估算 ↗</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const MEALS_CONFIG = [
+  { key:'breakfast', label:'早餐', emoji:'🌅' },
+  { key:'lunch',     label:'午餐', emoji:'☀️' },
+  { key:'dinner',    label:'晚餐', emoji:'🌙' },
+  { key:'snack',     label:'零食', emoji:'🍪' },
+];
+const FOOD_EMOJIS = {
+  '米饭':'🍚','面条':'🍜','包子':'🥟','饺子':'🥟','馒头':'🍞','粥':'🥣',
+  '鸡腿':'🍗','鸡胸':'🍗','牛肉':'🥩','猪肉':'🥩','鱼':'🐟','虾':'🦐',
+  '鸡蛋':'🥚','豆腐':'⬜','蔬菜':'🥦','沙拉':'🥗','水果':'🍎','苹果':'🍎',
+  '香蕉':'🍌','橙子':'🍊','牛奶':'🥛','咖啡':'☕','可乐':'🥤','果汁':'🧃',
+  '薯条':'🍟','汉堡':'🍔','披萨':'🍕','面包':'🍞','蛋糕':'🎂','饼干':'🍪',
+};
+
+let currentOffset = 0;
+let goal = parseInt(localStorage.getItem('calGoal') || '2000');
+let openMeals = { breakfast:true, lunch:true, dinner:true, snack:false };
+
+function getDateKey(offset) {
+  const d = new Date();
+  d.setDate(d.getDate() + offset);
+  return d.toISOString().slice(0,10);
+}
+function getDateLabel(offset) {
+  if (offset === 0) return '今天';
+  if (offset === -1) return '昨天';
+  if (offset === 1) return '明天';
+  const d = new Date(); d.setDate(d.getDate() + offset);
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+function getData(key) {
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
+}
+function saveData(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+
+function changeDay(dir) {
+  if (currentOffset + dir > 0) return;
+  currentOffset += dir;
+  render();
+}
+function updateGoal(v) {
+  goal = parseInt(v);
+  localStorage.setItem('calGoal', goal);
+  render();
+}
+
+function getEmoji(name) {
+  for (const [k,v] of Object.entries(FOOD_EMOJIS)) {
+    if (name.includes(k)) return v;
+  }
+  return '🍽️';
+}
+
+function addFood() {
+  const name = document.getElementById('foodName').value.trim();
+  const cal = parseInt(document.getElementById('foodCal').value);
+  const meal = document.getElementById('mealType').value;
+  if (!name) { showToast('请输入食物名称'); return; }
+  if (isNaN(cal) || cal < 0) { showToast('请输入卡路里'); return; }
+  const key = getDateKey(currentOffset);
+  const data = getData(key);
+  data.push({ id: Date.now(), name, cal, meal, emoji: getEmoji(name) });
+  saveData(key, data);
+  document.getElementById('foodName').value = '';
+  document.getElementById('foodCal').value = '';
+  openMeals[meal] = true;
+  render();
+  showToast('✓ 已添加');
+}
+
+function deleteFood(id) {
+  const key = getDateKey(currentOffset);
+  saveData(key, getData(key).filter(f => f.id !== id));
+  render();
+}
+
+function toggleMeal(key) {
+  openMeals[key] = !openMeals[key];
+  render();
+}
+
+function render() {
+  document.getElementById('dateLabel').textContent = getDateLabel(currentOffset);
+  document.getElementById('goalInput').value = goal;
+  document.getElementById('goalVal').textContent = goal;
+
+  const key = getDateKey(currentOffset);
+  const data = getData(key);
+  const total = data.reduce((s,f) => s+f.cal, 0);
+  const pct = Math.min(100, Math.round(total / goal * 100));
+  const remain = goal - total;
+
+  document.getElementById('ringCal').textContent = total;
+  document.getElementById('remainVal').textContent = Math.abs(remain);
+  document.getElementById('remainVal').className = 's-value ' + (remain < 0 ? 'over' : 'ok');
+  document.getElementById('countVal').textContent = data.length;
+  document.getElementById('pctVal').textContent = pct + '%';
+  document.getElementById('pctVal').className = 's-value ' + (pct >= 100 ? 'over' : 'accent');
+
+  const circ = 2 * Math.PI * 37;
+  const ring = document.getElementById('ringFill');
+  ring.style.strokeDashoffset = circ - (circ * pct / 100);
+  ring.style.stroke = pct >= 100 ? '#f87171' : pct >= 80 ? '#fb923c' : '#38bdf8';
+
+  const container = document.getElementById('mealsContainer');
+  container.innerHTML = '';
+  MEALS_CONFIG.forEach(({ key:mkey, label, emoji }) => {
+    const items = data.filter(f => f.meal === mkey);
+    const sub = items.reduce((s,f) => s+f.cal, 0);
+    const isOpen = openMeals[mkey];
+    const sec = document.createElement('div');
+    sec.className = 'meal-section';
+    sec.innerHTML = `
+      <div class="meal-header" onclick="toggleMeal('${mkey}')">
+        <div class="meal-header-left">
+          <span class="meal-icon">${emoji}</span>
+          <span class="meal-name">${label}</span>
+          ${sub > 0 ? `<span class="meal-subtotal">${sub} 千卡</span>` : ''}
+        </div>
+        <span class="meal-toggle ${isOpen?'open':''}">▾</span>
+      </div>
+      ${isOpen ? `<div class="meal-body">
+        ${items.length === 0
+          ? `<div class="empty-meal">还没有记录～</div>`
+          : items.map(f => `
+            <div class="food-item">
+              <span class="food-emoji">${f.emoji||'🍽️'}</span>
+              <span class="food-name">${f.name}</span>
+              <span class="food-cal">${f.cal} 千卡</span>
+              <button class="food-del" onclick="deleteFood(${f.id})">✕</button>
+            </div>`).join('')}
+      </div>` : ''}
+    `;
+    container.appendChild(sec);
+  });
+
+  // API banner
+  const hasKey = !!localStorage.getItem('anthropicKey');
+  document.getElementById('apiBanner').style.display = hasKey ? 'none' : 'block';
+}
+
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (!key.startsWith('sk-ant-')) { showToast('Key 格式不对，应以 sk-ant- 开头'); return; }
+  localStorage.setItem('anthropicKey', key);
+  showToast('✓ Key 已保存');
+  render();
+}
+
+async function handlePhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const apiKey = localStorage.getItem('anthropicKey');
+  if (!apiKey) { showToast('请先填入 API Key'); return; }
+
+  const btn = document.getElementById('photoBtnContent');
+  btn.innerHTML = '<span class="spinner"></span> AI 识别中…';
+  document.getElementById('photoBtn').disabled = true;
+
+  try {
+    const base64 = await fileToBase64(file);
+    const mediaType = file.type || 'image/jpeg';
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-20250514',
+        max_tokens: 500,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            { type: 'text', text: '请识别图片中的食物，返回JSON格式（不要加代码块）：{"items":[{"name":"食物名","cal":卡路里数字,"emoji":"表情"}]}。卡路里按图中实际份量估算（千卡整数）。如果有多种食物全部列出。' }
+          ]
+        }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '';
+    const parsed = JSON.parse(text.replace(/```json|```/g,'').trim());
+    if (parsed.items?.length) {
+      const meal = document.getElementById('mealType').value;
+      const key = getDateKey(currentOffset);
+      const existing = getData(key);
+      parsed.items.forEach(item => {
+        existing.push({ id: Date.now() + Math.random(), name: item.name, cal: item.cal, meal, emoji: item.emoji || getEmoji(item.name) });
+      });
+      saveData(key, existing);
+      openMeals[meal] = true;
+      render();
+      showToast(`✓ 识别到 ${parsed.items.length} 种食物`);
+    } else {
+      showToast('没识别到食物，请重试');
+    }
+  } catch(e) {
+    console.error(e);
+    showToast('识别失败，请检查 Key 或网络');
+  } finally {
+    btn.innerHTML = '📷 拍照 / 上传图片，AI 自动识别卡路里';
+    document.getElementById('photoBtn').disabled = false;
+    event.target.value = '';
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+function askAI() {
+  const name = document.getElementById('foodName').value.trim();
+  const q = name
+    ? `我吃了"${name}"，大概有多少卡路里（千卡）？给出常见份量的估算。`
+    : '帮我列出常见中餐的卡路里：米饭一碗、包子一个、红烧肉100g、可乐一罐，各多少千卡？';
+  window.open(`https://claude.ai/new?q=${encodeURIComponent(q)}`, '_blank');
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2200);
+}
+
+// Service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
+
+render();
+</script>
+</body>
+</html>
