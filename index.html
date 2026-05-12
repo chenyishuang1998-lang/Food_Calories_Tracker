@@ -266,14 +266,14 @@
 <body>
 
 <div class="header">
-  <div class="logo">Calorie</div>
+  <div class="logo" onclick="showPage('tracker')" style="cursor:pointer">Calorie</div>
   <div class="header-right">
     <div class="date-nav" id="dateNavWrap">
       <button class="icon-btn" onclick="changeDay(-1)">‹</button>
       <span class="date-label" id="dateLabel">Today</span>
       <button class="icon-btn" onclick="changeDay(1)">›</button>
     </div>
-    <button class="icon-btn" id="calPageBtn" onclick="showPage('calendar')" title="History">&#128197;</button>
+    <button class="icon-btn" id="calPageBtn" onclick="toggleCalendar()" title="History">&#128197;</button>
     <button class="icon-btn" onclick="openSettings()" title="Settings">&#9881;</button>
   </div>
 </div>
@@ -687,6 +687,16 @@ function clearKey() {
   showToast('Key cleared');
 }
 
+// ── Jump to a specific date in tracker ───────────────────────────────────────
+function jumpToDate(dateKey) {
+  const today = new Date();
+  const target = new Date(dateKey + 'T00:00:00');
+  const diffMs = target - new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diffDays = Math.round(diffMs / 86400000);
+  offset = diffDays;
+  showPage('tracker');
+}
+
 // ── Page switching ────────────────────────────────────────────────────────────
 function showPage(p) {
   currentPage = p;
@@ -702,6 +712,10 @@ function showPage(p) {
   } else {
     render();
   }
+}
+
+function toggleCalendar() {
+  showPage(currentPage === 'calendar' ? 'tracker' : 'calendar');
 }
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
@@ -755,7 +769,13 @@ function renderCalendar() {
       el.appendChild(dot);
     }
 
-    el.onclick = () => { selectedDate = dateKey; renderCalendar(); renderDayDetail(dateKey); };
+    el.onclick = () => {
+      if (selectedDate === dateKey) {
+        jumpToDate(dateKey);
+      } else {
+        selectedDate = dateKey; renderCalendar(); renderDayDetail(dateKey);
+      }
+    };
     grid.appendChild(el);
   }
 }
@@ -781,7 +801,13 @@ function renderTrend() {
       : day.total > goal ? '#fca5a5'
       : day.total > goal * 0.8 ? '#fcd34d' : '#86efac';
     bar.title = `${day.total} kcal`;
-    bar.onclick = () => { selectedDate = day.key; renderCalendar(); renderDayDetail(day.key); };
+    bar.onclick = () => {
+      if (selectedDate === day.key) {
+        jumpToDate(day.key);
+      } else {
+        selectedDate = day.key; renderCalendar(); renderDayDetail(day.key);
+      }
+    };
     const lbl = document.createElement('div'); lbl.className = 'bar-x'; lbl.textContent = day.label;
     col.appendChild(bar); col.appendChild(lbl);
     chart.appendChild(col);
@@ -797,8 +823,8 @@ function renderDayDetail(dateKey) {
 
   el.style.display = 'block';
   el.innerHTML = `
-    <div class="day-detail-header">
-      <div class="day-detail-date">${label}</div>
+    <div class="day-detail-header" onclick="jumpToDate('${dateKey}')" style="cursor:pointer" title="Open this day">
+      <div class="day-detail-date">${label} <span style="font-size:11px;color:var(--muted)">↗</span></div>
       <div class="day-detail-cal">${total} kcal</div>
     </div>
     ${data.length === 0
