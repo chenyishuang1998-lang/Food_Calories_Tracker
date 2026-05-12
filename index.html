@@ -468,32 +468,28 @@
 
 <script>
 // ── Supabase ──────────────────────────────────────────────────────────────────
-const _supa = supabase.createClient('https://gaylozwyejdszpjamaiw.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdheWxvend5ZWpkc3pwamFtYWl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MjM3OTksImV4cCI6MjA5NDE5OTc5OX0.S4z5yFxS5_smwkXOBpjxJJ062s7u4pVihQwnf3nWzXU');
+const _supa = supabase.createClient('https://gaylozwyejdszpjamaiw.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdheWxvend5ZWpkc3pwamFtYWl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MjM3OTksImV4cCI6MjA5NDE5OTc5OX0.S4z5yFxS5_smwkXOBpjxJJ062s7u4pVihQwnf3nWzXU', {
+  auth: {
+    flowType: 'implicit',
+    detectSessionInUrl: true,
+    persistSession: true,
+  }
+});
 let _user = null;
 
 async function initAuth() {
-  // Handle hash-based OAuth redirect first
-  if (window.location.hash.includes('access_token')) {
-    // Let Supabase parse the hash
-    await new Promise(r => setTimeout(r, 500));
-    history.replaceState(null, '', window.location.pathname);
-  }
-
-  // Get current session
-  const { data: { session } } = await _supa.auth.getSession();
-  if (session) {
-    setUser(session.user);
-    syncFromCloud();
-  }
-
-  // Listen for future auth changes
+  // onAuthStateChange fires immediately with current session
+  // and also handles implicit OAuth redirect from URL hash
   _supa.auth.onAuthStateChange((event, session) => {
+    console.log('Auth event:', event, session?.user?.email);
     if (session) {
       setUser(session.user);
-      if (event === 'SIGNED_IN') syncFromCloud();
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') syncFromCloud();
     } else {
       setUser(null);
     }
+    // Clean up URL
+    if (window.location.hash) history.replaceState(null, '', window.location.pathname);
   });
 }
 
