@@ -478,18 +478,41 @@ const _supa = supabase.createClient('https://gaylozwyejdszpjamaiw.supabase.co', 
 let _user = null;
 
 async function initAuth() {
-  // onAuthStateChange fires immediately with current session
-  // and also handles implicit OAuth redirect from URL hash
+  // Parse access_token from URL hash manually if present
+  const hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.slice(1));
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    if (accessToken) {
+      try {
+        const { data, error } = await _supa.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || ''
+        });
+        if (data?.user) {
+          setUser(data.user);
+          syncFromCloud();
+        }
+      } catch(e) { console.error('setSession error:', e); }
+    }
+    history.replaceState(null, '', window.location.pathname);
+    return;
+  }
+
+  // No hash — check existing session
+  const { data: { session } } = await _supa.auth.getSession();
+  if (session) {
+    setUser(session.user);
+  }
+
   _supa.auth.onAuthStateChange((event, session) => {
-    console.log('Auth event:', event, session?.user?.email);
     if (session) {
       setUser(session.user);
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') syncFromCloud();
+      if (event === 'SIGNED_IN') syncFromCloud();
     } else {
       setUser(null);
     }
-    // Clean up URL
-    if (window.location.hash) history.replaceState(null, '', window.location.pathname);
   });
 }
 
