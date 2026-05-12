@@ -127,15 +127,17 @@
     .add-section { margin-top: 22px; }
     .section-label { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 10px; }
 
+    .photo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
     .photo-btn {
-      width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+      display: flex; align-items: center; justify-content: center; gap: 7px;
       background: var(--surface); border: 1px dashed var(--border-dark);
-      border-radius: var(--r); padding: 12px;
+      border-radius: var(--r); padding: 13px 10px;
       cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 400;
-      color: var(--muted); transition: all 0.12s; margin-bottom: 8px;
+      color: var(--muted); transition: all 0.12s; width: 100%;
     }
-    .photo-btn:hover { border-color: var(--text); color: var(--text); }
-    #photoInput { display: none; }
+    .photo-btn:hover { border-color: var(--text); color: var(--text); background: var(--surface2); }
+    .photo-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #photoInput, #albumInput { display: none; }
 
     input, select {
       background: var(--surface); border: 1px solid var(--border);
@@ -309,10 +311,16 @@
 
     <div class="add-section">
       <div class="section-label">Add food</div>
-      <input type="file" id="photoInput" accept="image/*" capture="environment" onchange="handlePhoto(event)" />
-      <button class="photo-btn" onclick="document.getElementById('photoInput').click()" id="photoBtn">
-        <span id="photoBtnInner">📷 Snap a photo — AI identifies calories</span>
-      </button>
+      <input type="file" id="photoInput" accept="image/*" capture="environment" onchange="handlePhoto(event,'camera')" />
+      <input type="file" id="albumInput" accept="image/*" onchange="handlePhoto(event,'album')" />
+      <div class="photo-row">
+        <button class="photo-btn" id="cameraBtn" onclick="document.getElementById('photoInput').click()">
+          <span id="cameraBtnInner">📷 Take Photo</span>
+        </button>
+        <button class="photo-btn" id="albumBtn" onclick="document.getElementById('albumInput').click()">
+          <span id="albumBtnInner">🖼️ Choose Photo</span>
+        </button>
+      </div>
       <div class="input-row">
         <input type="text" id="foodName" placeholder="Food name" />
         <input type="number" id="foodCal" placeholder="kcal" min="0" class="input-short" />
@@ -610,48 +618,7 @@ function deleteFood(id) {
 function toggleMeal(k) { openMeals[k] = !openMeals[k]; render(); }
 
 // ── Photo / AI ────────────────────────────────────────────────────────────────
-const PROMPT = 'Identify all foods in this image. Return only raw JSON, no markdown: {"items":[{"name":"food name","cal":integer_kcal,"emoji":"single emoji"}]}. Estimate kcal for visible portion. List every distinct food item.';
-
-async function callAnthropic(base64, mediaType, apiKey) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-opus-4-20250514',
-      max_tokens: 500,
-      messages: [{ role:'user', content:[
-        { type:'image', source:{ type:'base64', media_type: mediaType, data: base64 }},
-        { type:'text', text: PROMPT }
-      ]}]
-    })
-  });
-  const d = await res.json();
-  if (d.error) throw new Error(d.error.message);
-  return (d.content?.[0]?.text || '').replace(/```json|```/g,'').trim();
-}
-
-async function callGemini(base64, mediaType, apiKey) {
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [
-        { inline_data: { mime_type: mediaType, data: base64 }},
-        { text: PROMPT }
-      ]}]
-    })
-  });
-  const d = await res.json();
-  if (d.error) throw new Error(d.error.message);
-  return (d.candidates?.[0]?.content?.parts?.[0]?.text || '').replace(/```json|```/g,'').trim();
-}
-
-async function handlePhoto(event) {
+async function handlePhoto(event, source) {
   const file = event.target.files[0];
   if (!file) return;
 
@@ -659,17 +626,27 @@ async function handlePhoto(event) {
   const apiKey = localStorage.getItem(provider + 'Key');
   if (!apiKey) { openSettings(); showToast('Set your API key first'); return; }
 
-  const inner = document.getElementById('photoBtnInner');
-  inner.innerHTML = '<span class="spinner"></span> Identifying…';
-  document.getElementById('photoBtn').disabled = true;
+  // Show loading on the right button
+  const btnId = source === 'camera' ? 'cameraBtn' : 'albumBtn';
+  const innerId = source === 'camera' ? 'cameraBtnInner' : 'albumBtnInner';
+  const origText = source === 'camera' ? '📷 Take Photo' : '🖼️ Choose Photo';
+  document.getElementById(innerId).innerHTML = '<span class="spinner"></span> Identifying…';
+  document.getElementById(btnId).disabled = true;
+  document.getElementById(source === 'camera' ? 'albumBtn' : 'cameraBtn').disabled = true;
 
   try {
     const base64 = await fileToBase64(file);
     const mediaType = file.type || 'image/jpeg';
-    const text = provider === 'gemini'
-      ? await callGemini(base64, mediaType, apiKey)
-      : await callAnthropic(base64, mediaType, apiKey);
-    const parsed = JSON.parse(text);
+
+    // Route through Vercel proxy to avoid CORS
+    const res = await fetch('/api/recognize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider, apiKey, base64, mediaType })
+    });
+    const parsed = await res.json();
+    if (!res.ok) throw new Error(parsed.error || 'Server error');
+
     if (parsed.items?.length) {
       const meal = document.getElementById('mealType').value;
       const key = keyByOffset(offset);
@@ -684,10 +661,11 @@ async function handlePhoto(event) {
     } else { showToast('No food detected — try again'); }
   } catch(e) {
     console.error(e);
-    showToast('Recognition failed — check your key');
+    showToast(e.message ? e.message.slice(0, 80) : 'Recognition failed');
   } finally {
-    inner.innerHTML = '📷 Snap a photo — AI identifies calories';
-    document.getElementById('photoBtn').disabled = false;
+    document.getElementById(innerId).innerHTML = origText;
+    document.getElementById('cameraBtn').disabled = false;
+    document.getElementById('albumBtn').disabled = false;
     event.target.value = '';
   }
 }
