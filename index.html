@@ -311,12 +311,12 @@
 
     <div class="add-section">
       <div class="section-label">Add food</div>
-      <input type="file" id="photoInput" accept="image/jpeg,image/png" capture="environment" onchange="handlePhoto(event)" />
+      <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" onchange="handlePhoto(event)" />
       <div class="photo-row">
         <button class="photo-btn" id="cameraBtn" onclick="openCamera()">
           <span id="cameraBtnInner">📷 Take Photo</span>
         </button>
-        <button class="photo-btn" id="albumBtn" onclick="document.getElementById('photoInput').click()">
+        <button class="photo-btn" id="albumBtn" onclick="showToast('Use Take Photo on iOS — library upload not supported by Safari')">
           <span id="albumBtnInner">🖼️ From Library</span>
         </button>
       </div>
@@ -628,6 +628,12 @@ function toggleMeal(k) { openMeals[k] = !openMeals[k]; render(); }
 async function handlePhoto(event) {
   const file = event.target.files[0];
   if (!file) return;
+  // iOS Safari cannot send File objects via fetch - use Take Photo instead
+  if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+    showToast('Please use Take Photo instead — iOS Safari limitation');
+    event.target.value = '';
+    return;
+  }
 
   const provider = localStorage.getItem('aiProvider') || 'anthropic';
   const apiKey = localStorage.getItem(provider + 'Key');
@@ -639,15 +645,12 @@ async function handlePhoto(event) {
   document.getElementById('cameraBtn').disabled = true;
 
   try {
-    const base64 = await fileToBase64(file);
-    const mediaType = 'image/jpeg';
-
-    // Route through Vercel proxy to avoid CORS
-    const res = await fetch('/api/recognize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, apiKey, base64, mediaType })
-    });
+    // Send file directly as multipart - bypasses all iOS Safari base64 restrictions
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('provider', provider);
+    formData.append('apiKey', apiKey);
+    const res = await fetch('/api/recognize', { method: 'POST', body: formData });
     const parsed = await res.json();
     if (!res.ok) throw new Error(parsed.error || 'Server error');
 
@@ -675,42 +678,7 @@ async function handlePhoto(event) {
   }
 }
 
-async function fileToBase64(file) {
-  // Check file size - warn if over 5MB
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error('Photo too large — please use a smaller image (under 5MB)');
-  }
-
-  // Read as data URL first (most compatible on iOS PWA)
-  const dataUrl = await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = () => reject(new Error('FileReader failed'));
-    reader.readAsDataURL(file);
-  });
-
-  // Then draw onto canvas to resize + convert to JPEG
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      try {
-        const MAX = 800;
-        let w = img.width, h = img.height;
-        if (w > MAX || h > MAX) {
-          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-          else { w = Math.round(w * MAX / h); h = MAX; }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        const out = canvas.toDataURL('image/jpeg', 0.82);
-        resolve(out.split(',')[1]);
-      } catch(e) { reject(new Error('Resize failed: ' + e.message)); }
-    };
-    img.onerror = () => reject(new Error('Could not decode image'));
-    img.src = dataUrl;
-  });
-}
+// fileToBase64 removed - using FormData directly in handlePhoto
 
 
 function askAI() {
@@ -956,10 +924,38 @@ function closeCamera() {
 
 async function snapPhoto() {
   const video = document.getElementById('cameraStream');
+
+  // Get dimensions - fall back to video element size if videoWidth is 0
+  const w = video.videoWidth || video.offsetWidth || 640;
+  const h = video.videoHeight || video.offsetHeight || 480;
+
   const canvas = document.createElement('canvas');
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext('2d').drawImage(video, 0, 0);
+  // Resize to max 1024px to keep payload small
+  const MAX = 1024;
+  let cw = w, ch = h;
+  if (cw > MAX || ch > MAX) {
+    if (cw > ch) { ch = Math.round(ch * MAX / cw); cw = MAX; }
+    else { cw = Math.round(cw * MAX / ch); ch = MAX; }
+  }
+  canvas.width = cw;
+  canvas.height = ch;
+  canvas.getContext('2d').drawImage(video, 0, 0, cw, ch);
+
+  // Get base64 BEFORE closing camera
+  let base64;
+  try {
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    base64 = dataUrl.split(',')[1];
+    showToast(`Canvas: ${cw}x${ch}, base64: ${base64?.length || 0} chars`);
+  } catch(canvasErr) {
+    showToast('Canvas error: ' + canvasErr.message);
+    return;
+  }
+  if (!base64 || base64.length < 100) {
+    showToast(`Image too small (${base64?.length || 0}) — try again`);
+    return;
+  }
+
   closeCamera();
 
   const provider = localStorage.getItem('aiProvider') || 'anthropic';
@@ -971,7 +967,6 @@ async function snapPhoto() {
   document.getElementById('albumBtn').disabled = true;
 
   try {
-    const base64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
     const res = await fetch('/api/recognize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
