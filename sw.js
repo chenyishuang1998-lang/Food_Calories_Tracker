@@ -1,4 +1,4 @@
-const CACHE = 'jintianchisha-v1';
+const CACHE = 'calorie-v2';
 const ASSETS = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
@@ -16,6 +16,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (e.request.url.includes('anthropic.com')) return;
+  if (e.request.url.includes('googleapis.com')) return;
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
