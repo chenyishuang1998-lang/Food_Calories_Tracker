@@ -99,6 +99,17 @@ export default async function handler(req, res) {
 
   } catch (e) {
     console.error(e);
-    return res.status(500).json({ error: e.message || 'Internal server error' });
+    let msg = e.message || 'Internal server error';
+    // Try to extract quota reset time from Gemini error
+    if (msg.includes('quota') || msg.includes('RESOURCE_EXHAUSTED')) {
+      const resetMatch = msg.match(/retry after (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^'"\s]*)/i);
+      if (resetMatch) {
+        const resetTime = new Date(resetMatch[1]);
+        msg = `Quota exceeded — resets at ${resetTime.toLocaleTimeString()}`;
+      } else {
+        msg = 'Quota exceeded — resets daily at midnight Pacific Time';
+      }
+    }
+    return res.status(500).json({ error: msg });
   }
 }
