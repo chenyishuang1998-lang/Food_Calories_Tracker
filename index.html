@@ -11,6 +11,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <title>Calorie</title>
   <style>
@@ -264,6 +265,16 @@
       animation: toastIn 0.18s ease;
     }
     @keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(6px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+
+    /* Auth */
+    .auth-bar { display:flex; align-items:center; justify-content:space-between; padding:10px 20px; background:var(--surface); border-bottom:1px solid var(--border); font-size:13px; }
+    .auth-bar .user-info { display:flex; align-items:center; gap:8px; color:var(--muted); }
+    .auth-bar .user-avatar { width:24px; height:24px; border-radius:50%; }
+    .auth-btn { background:var(--text); color:#fff; border:none; border-radius:var(--r-sm); padding:6px 14px; font-size:12px; font-family:inherit; cursor:pointer; }
+    .auth-btn.ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+    .sync-dot { width:6px; height:6px; border-radius:50%; background:var(--green); display:inline-block; }
+    .sync-dot.syncing { background:var(--amber); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   </style>
 </head>
 <body>
@@ -279,6 +290,14 @@
     <button class="icon-btn" id="calPageBtn" onclick="toggleCalendar()" title="History">&#128197;</button>
     <button class="icon-btn" onclick="openSettings()" title="Settings">&#9881;</button>
   </div>
+</div>
+
+<!-- Auth bar -->
+<div class="auth-bar" id="authBar">
+  <div class="user-info" id="userInfo">
+    <span style="color:var(--muted)">Not signed in — data saved locally</span>
+  </div>
+  <button class="auth-btn" id="authBtn" onclick="handleAuth()">Sign in with Google</button>
 </div>
 
 <!-- Tracker page -->
@@ -448,6 +467,101 @@
 </div>
 
 <script>
+// ── Supabase ──────────────────────────────────────────────────────────────────
+const _supa = supabase.createClient('https://gaylozwyejdszpjamaiw.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdheWxvend5ZWpkc3pwamFtYWl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MjM3OTksImV4cCI6MjA5NDE5OTc5OX0.S4z5yFxS5_smwkXOBpjxJJ062s7u4pVihQwnf3nWzXU');
+let _user = null;
+
+async function initAuth() {
+  const { data: { session } } = await _supa.auth.getSession();
+  if (session) setUser(session.user);
+
+  _supa.auth.onAuthStateChange((event, session) => {
+    if (session) { setUser(session.user); syncFromCloud(); }
+    else setUser(null);
+  });
+
+  // Handle OAuth redirect
+  if (window.location.hash.includes('access_token')) {
+    const { data: { session } } = await _supa.auth.getSession();
+    if (session) { setUser(session.user); syncFromCloud(); }
+    history.replaceState(null, '', window.location.pathname);
+  }
+}
+
+function setUser(user) {
+  _user = user;
+  const bar = document.getElementById('authBar');
+  const info = document.getElementById('userInfo');
+  const btn = document.getElementById('authBtn');
+  if (user) {
+    const avatar = user.user_metadata?.avatar_url;
+    info.innerHTML = `${avatar ? `<img class="user-avatar" src="${avatar}" />` : ''}<span>${user.user_metadata?.full_name || user.email}</span><span class="sync-dot" id="syncDot"></span>`;
+    btn.textContent = 'Sign out';
+    btn.className = 'auth-btn ghost';
+  } else {
+    info.innerHTML = '<span style="color:var(--muted)">Not signed in — data saved locally</span>';
+    btn.textContent = 'Sign in with Google';
+    btn.className = 'auth-btn';
+  }
+}
+
+async function handleAuth() {
+  if (_user) {
+    await _supa.auth.signOut();
+    setUser(null);
+  } else {
+    await _supa.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin }
+    });
+  }
+}
+
+async function syncToCloud(dateKey, data) {
+  if (!_user) return;
+  const dot = document.getElementById('syncDot');
+  if (dot) dot.className = 'sync-dot syncing';
+  try {
+    // Delete existing records for this date
+    await _supa.from('food_logs').delete().eq('user_id', _user.id).eq('date', dateKey);
+    // Insert new records
+    if (data.length > 0) {
+      const rows = data.map(f => ({
+        user_id: _user.id,
+        date: dateKey,
+        name: f.name,
+        cal: f.cal,
+        meal: f.meal,
+        emoji: f.emoji || '🍽️'
+      }));
+      await _supa.from('food_logs').insert(rows);
+    }
+  } catch(e) { console.error('Sync error:', e); }
+  if (dot) dot.className = 'sync-dot';
+}
+
+async function syncFromCloud() {
+  if (!_user) return;
+  try {
+    const { data: rows } = await _supa.from('food_logs')
+      .select('*')
+      .eq('user_id', _user.id)
+      .order('created_at', { ascending: true });
+    if (!rows?.length) return;
+    // Group by date and save to localStorage
+    const byDate = {};
+    rows.forEach(r => {
+      if (!byDate[r.date]) byDate[r.date] = [];
+      byDate[r.date].push({ id: Date.now() + Math.random(), name: r.name, cal: r.cal, meal: r.meal, emoji: r.emoji });
+    });
+    Object.entries(byDate).forEach(([date, items]) => {
+      localStorage.setItem(date, JSON.stringify(items));
+    });
+    render();
+    showToast('Data synced from cloud');
+  } catch(e) { console.error('Sync from cloud error:', e); }
+}
+
 // ── Date helpers (timezone-safe) ──────────────────────────────────────────────
 // Always use local wall-clock date, never UTC
 function localDateKey(date) {
@@ -512,7 +626,7 @@ let calYear, calMonth, selectedDate;
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 function getData(key) { try { return JSON.parse(localStorage.getItem(key)||'[]'); } catch { return []; } }
-function saveData(key, d) { localStorage.setItem(key, JSON.stringify(d)); }
+function saveData(key, d) { localStorage.setItem(key, JSON.stringify(d)); syncToCloud(key, d); }
 
 function getEmoji(name) {
   const n = name.toLowerCase();
