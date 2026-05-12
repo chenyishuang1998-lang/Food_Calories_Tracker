@@ -1,4 +1,4 @@
-const CACHE = 'calorie-v2';
+const CACHE = 'calorie-v3';
 const ASSETS = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {
