@@ -472,7 +472,21 @@ const _supa = supabase.createClient('https://gaylozwyejdszpjamaiw.supabase.co', 
 let _user = null;
 
 async function initAuth() {
-  // Listen first, then get session — avoids race condition after OAuth redirect
+  // Handle hash-based OAuth redirect first
+  if (window.location.hash.includes('access_token')) {
+    // Let Supabase parse the hash
+    await new Promise(r => setTimeout(r, 500));
+    history.replaceState(null, '', window.location.pathname);
+  }
+
+  // Get current session
+  const { data: { session } } = await _supa.auth.getSession();
+  if (session) {
+    setUser(session.user);
+    syncFromCloud();
+  }
+
+  // Listen for future auth changes
   _supa.auth.onAuthStateChange((event, session) => {
     if (session) {
       setUser(session.user);
@@ -481,15 +495,6 @@ async function initAuth() {
       setUser(null);
     }
   });
-
-  // Get current session (handles redirect back from Google)
-  const { data: { session } } = await _supa.auth.getSession();
-  if (session) setUser(session.user);
-
-  // Clean up URL hash after OAuth redirect
-  if (window.location.hash.includes('access_token')) {
-    history.replaceState(null, '', window.location.pathname);
-  }
 }
 
 function setUser(user) {
