@@ -365,23 +365,53 @@
     <div class="sheet-handle"></div>
     <div class="sheet-title">Settings</div>
 
+    <!-- AI Provider selector -->
     <div class="setting-row">
+      <div class="setting-label">AI Provider</div>
+      <select id="providerSel" onchange="switchProvider(this.value)" style="width:140px">
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="gemini">Google Gemini</option>
+      </select>
+    </div>
+
+    <!-- Anthropic key -->
+    <div class="setting-row" id="anthropicRow">
       <div>
         <div class="setting-label">Anthropic API Key</div>
-        <div class="setting-desc">Required for photo recognition</div>
+        <div class="setting-desc"><a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">console.anthropic.com ↗</a></div>
       </div>
       <div style="text-align:right">
-        <div class="key-status unset" id="keyStatus">Not set</div>
-        <button class="btn-text" onclick="toggleKeyInput()" id="keyToggleBtn" style="margin-top:3px">Set key</button>
+        <div class="key-status unset" id="anthropicStatus">Not set</div>
+        <button class="btn-text" onclick="toggleKeyInput('anthropic')" style="margin-top:3px" id="anthropicToggleBtn">Set key</button>
       </div>
     </div>
-    <div id="keyInputWrap">
+    <div id="anthropicKeyWrap" style="display:none">
       <div class="key-input-row">
-        <input type="password" id="keyInput" placeholder="sk-ant-…" autocomplete="off" />
-        <button class="btn-sm" onclick="saveKey()">Save</button>
-        <button class="btn-sm ghost" onclick="clearKey()">Clear</button>
+        <input type="password" id="anthropicKeyInput" placeholder="sk-ant-…" autocomplete="off" />
+        <button class="btn-sm" onclick="saveKey('anthropic')">Save</button>
+        <button class="btn-sm ghost" onclick="clearKey('anthropic')">Clear</button>
       </div>
-      <div class="key-hint">Stored locally on device only · <a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">Get a key ↗</a></div>
+      <div class="key-hint">Stored locally on device only</div>
+    </div>
+
+    <!-- Gemini key -->
+    <div class="setting-row" id="geminiRow" style="display:none">
+      <div>
+        <div class="setting-label">Gemini API Key</div>
+        <div class="setting-desc"><a href="https://aistudio.google.com" target="_blank" style="color:var(--blue)">aistudio.google.com ↗</a> · Free</div>
+      </div>
+      <div style="text-align:right">
+        <div class="key-status unset" id="geminiStatus">Not set</div>
+        <button class="btn-text" onclick="toggleKeyInput('gemini')" style="margin-top:3px" id="geminiToggleBtn">Set key</button>
+      </div>
+    </div>
+    <div id="geminiKeyWrap" style="display:none">
+      <div class="key-input-row">
+        <input type="password" id="geminiKeyInput" placeholder="AIza…" autocomplete="off" />
+        <button class="btn-sm" onclick="saveKey('gemini')">Save</button>
+        <button class="btn-sm ghost" onclick="clearKey('gemini')">Clear</button>
+      </div>
+      <div class="key-hint">Stored locally on device only</div>
     </div>
 
     <div class="setting-row">
@@ -580,10 +610,53 @@ function deleteFood(id) {
 function toggleMeal(k) { openMeals[k] = !openMeals[k]; render(); }
 
 // ── Photo / AI ────────────────────────────────────────────────────────────────
+const PROMPT = 'Identify all foods in this image. Return only raw JSON, no markdown: {"items":[{"name":"food name","cal":integer_kcal,"emoji":"single emoji"}]}. Estimate kcal for visible portion. List every distinct food item.';
+
+async function callAnthropic(base64, mediaType, apiKey) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: 'claude-opus-4-20250514',
+      max_tokens: 500,
+      messages: [{ role:'user', content:[
+        { type:'image', source:{ type:'base64', media_type: mediaType, data: base64 }},
+        { type:'text', text: PROMPT }
+      ]}]
+    })
+  });
+  const d = await res.json();
+  if (d.error) throw new Error(d.error.message);
+  return (d.content?.[0]?.text || '').replace(/```json|```/g,'').trim();
+}
+
+async function callGemini(base64, mediaType, apiKey) {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [
+        { inline_data: { mime_type: mediaType, data: base64 }},
+        { text: PROMPT }
+      ]}]
+    })
+  });
+  const d = await res.json();
+  if (d.error) throw new Error(d.error.message);
+  return (d.candidates?.[0]?.content?.parts?.[0]?.text || '').replace(/```json|```/g,'').trim();
+}
+
 async function handlePhoto(event) {
   const file = event.target.files[0];
   if (!file) return;
-  const apiKey = localStorage.getItem('anthropicKey');
+
+  const provider = localStorage.getItem('aiProvider') || 'anthropic';
+  const apiKey = localStorage.getItem(provider + 'Key');
   if (!apiKey) { openSettings(); showToast('Set your API key first'); return; }
 
   const inner = document.getElementById('photoBtnInner');
@@ -592,25 +665,10 @@ async function handlePhoto(event) {
 
   try {
     const base64 = await fileToBase64(file);
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-opus-4-20250514',
-        max_tokens: 500,
-        messages: [{ role:'user', content:[
-          { type:'image', source:{ type:'base64', media_type: file.type||'image/jpeg', data: base64 }},
-          { type:'text', text:'Identify all foods in this image. Return only raw JSON, no markdown: {"items":[{"name":"food name","cal":integer_kcal,"emoji":"single emoji"}]}. Estimate kcal for visible portion. List every distinct food item.' }
-        ]}]
-      })
-    });
-    const d = await res.json();
-    const text = (d.content?.[0]?.text || '').replace(/```json|```/g,'').trim();
+    const mediaType = file.type || 'image/jpeg';
+    const text = provider === 'gemini'
+      ? await callGemini(base64, mediaType, apiKey)
+      : await callAnthropic(base64, mediaType, apiKey);
     const parsed = JSON.parse(text);
     if (parsed.items?.length) {
       const meal = document.getElementById('mealType').value;
@@ -655,34 +713,57 @@ function askAI() {
 function openSettings() {
   refreshKeyStatus();
   document.getElementById('goalSheetSel').value = goal;
+  const provider = localStorage.getItem('aiProvider') || 'anthropic';
+  document.getElementById('providerSel').value = provider;
+  switchProvider(provider);
   document.getElementById('settingsOverlay').classList.add('open');
 }
 function closeSettings() { document.getElementById('settingsOverlay').classList.remove('open'); }
 function closeSettingsIfBg(e) { if (e.target === document.getElementById('settingsOverlay')) closeSettings(); }
+
+function switchProvider(provider) {
+  localStorage.setItem('aiProvider', provider);
+  document.getElementById('anthropicRow').style.display = provider === 'anthropic' ? 'flex' : 'none';
+  document.getElementById('geminiRow').style.display = provider === 'gemini' ? 'flex' : 'none';
+  document.getElementById('anthropicKeyWrap').style.display = 'none';
+  document.getElementById('geminiKeyWrap').style.display = 'none';
+}
+
 function refreshKeyStatus() {
-  const has = !!localStorage.getItem('anthropicKey');
-  const el = document.getElementById('keyStatus');
-  el.textContent = has ? '● Set' : 'Not set';
-  el.className = 'key-status ' + (has ? 'set' : 'unset');
-  document.getElementById('keyToggleBtn').textContent = has ? 'Change' : 'Set key';
+  ['anthropic', 'gemini'].forEach(p => {
+    const has = !!localStorage.getItem(p + 'Key');
+    const el = document.getElementById(p + 'Status');
+    el.textContent = has ? '● Set' : 'Not set';
+    el.className = 'key-status ' + (has ? 'set' : 'unset');
+    document.getElementById(p + 'ToggleBtn').textContent = has ? 'Change' : 'Set key';
+  });
 }
-function toggleKeyInput() {
-  const w = document.getElementById('keyInputWrap');
-  w.style.display = w.style.display === 'none' ? 'block' : 'none';
+
+function toggleKeyInput(provider) {
+  const wrap = document.getElementById(provider + 'KeyWrap');
+  wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
 }
-function saveKey() {
-  const v = document.getElementById('keyInput').value.trim();
-  if (!v.startsWith('sk-ant-')) { showToast('Key should start with sk-ant-'); return; }
-  localStorage.setItem('anthropicKey', v);
-  document.getElementById('keyInput').value = '';
-  document.getElementById('keyInputWrap').style.display = 'none';
+
+function saveKey(provider) {
+  const input = document.getElementById(provider + 'KeyInput');
+  const v = input.value.trim();
+  if (provider === 'anthropic' && !v.startsWith('sk-ant-')) {
+    showToast('Anthropic key should start with sk-ant-'); return;
+  }
+  if (provider === 'gemini' && !v.startsWith('AIza')) {
+    showToast('Gemini key should start with AIza'); return;
+  }
+  localStorage.setItem(provider + 'Key', v);
+  input.value = '';
+  document.getElementById(provider + 'KeyWrap').style.display = 'none';
   refreshKeyStatus();
   showToast('API key saved');
 }
-function clearKey() {
-  localStorage.removeItem('anthropicKey');
-  document.getElementById('keyInput').value = '';
-  document.getElementById('keyInputWrap').style.display = 'none';
+
+function clearKey(provider) {
+  localStorage.removeItem(provider + 'Key');
+  document.getElementById(provider + 'KeyInput').value = '';
+  document.getElementById(provider + 'KeyWrap').style.display = 'none';
   refreshKeyStatus();
   showToast('Key cleared');
 }
