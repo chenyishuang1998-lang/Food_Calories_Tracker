@@ -581,9 +581,10 @@ async function initAuth() {
   }
 
   _supa.auth.onAuthStateChange(async (event, session) => {
+    console.log('[auth] event:', event, 'session:', !!session);
     if (session) {
       setUser(session.user);
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         await syncFromCloud();
         showApp();
       }
@@ -678,8 +679,11 @@ async function syncToCloud(dateKey, data) {
   return _pendingSync;
 }
 
+let _syncing = false;
 async function syncFromCloud() {
   if (!_user) { console.log('[sync] no user, skip'); return; }
+  if (_syncing) { console.log('[sync] already syncing, skip'); return; }
+  _syncing = true;
   console.log('[sync] starting for user', _user.id);
   try {
     const { data: rows, error } = await _supa.from('food_logs')
@@ -709,6 +713,7 @@ async function syncFromCloud() {
     render();
     showToast('Data synced from cloud');
   } catch(e) { console.error('Sync from cloud error:', e); }
+  finally { _syncing = false; }
 }
 
 // ── Date helpers (timezone-safe) ──────────────────────────────────────────────
