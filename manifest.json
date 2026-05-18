@@ -1,13 +1,13 @@
 {
-  "name": "今天吃啥",
-  "short_name": "吃啥",
-  "description": "记录每天吃啥，轻松追踪卡路里",
+  "name": "Kcal",
+  "short_name": "Kcal",
+  "description": "Track your daily calories with ease",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "orientation": "portrait",
-  "lang": "zh-CN",
+  "lang": "en",
   "icons": [
     {
       "src": "/icons/icon-192.png",
