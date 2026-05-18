@@ -590,6 +590,12 @@ function setUser(user) {
 
 async function handleAuth() {
   if (_user) {
+    // Wait for any pending sync to finish before signing out
+    const dot = document.getElementById('syncDot');
+    if (dot?.classList.contains('syncing')) {
+      showToast('Syncing… please wait');
+    }
+    await _pendingSync;
     await _supa.auth.signOut();
     setUser(null);
     localStorage.removeItem('skippedLogin');
@@ -606,27 +612,31 @@ async function handleAuth() {
   }
 }
 
+let _pendingSync = Promise.resolve();
+
 async function syncToCloud(dateKey, data) {
   if (!_user) return;
   const dot = document.getElementById('syncDot');
   if (dot) dot.className = 'sync-dot syncing';
-  try {
-    // Delete existing records for this date
-    await _supa.from('food_logs').delete().eq('user_id', _user.id).eq('date', dateKey);
-    // Insert new records
-    if (data.length > 0) {
-      const rows = data.map(f => ({
-        user_id: _user.id,
-        date: dateKey,
-        name: f.name,
-        cal: f.cal,
-        meal: f.meal,
-        emoji: f.emoji || '🍽️'
-      }));
-      await _supa.from('food_logs').insert(rows);
-    }
-  } catch(e) { console.error('Sync error:', e); }
-  if (dot) dot.className = 'sync-dot';
+  const sync = async () => {
+    try {
+      await _supa.from('food_logs').delete().eq('user_id', _user.id).eq('date', dateKey);
+      if (data.length > 0) {
+        const rows = data.map(f => ({
+          user_id: _user.id,
+          date: dateKey,
+          name: f.name,
+          cal: f.cal,
+          meal: f.meal,
+          emoji: f.emoji || '🍽️'
+        }));
+        await _supa.from('food_logs').insert(rows);
+      }
+    } catch(e) { console.error('Sync error:', e); }
+    if (dot) dot.className = 'sync-dot';
+  };
+  _pendingSync = _pendingSync.then(sync);
+  return _pendingSync;
 }
 
 async function syncFromCloud() {
