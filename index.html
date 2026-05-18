@@ -509,6 +509,11 @@ async function handleAuth() {
   if (_user) {
     await _supa.auth.signOut();
     setUser(null);
+    // Clear all food data from localStorage on sign out
+    Object.keys(localStorage).forEach(k => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k)) localStorage.removeItem(k);
+    });
+    render();
   } else {
     await _supa.auth.signInWithOAuth({
       provider: 'google',
@@ -547,7 +552,14 @@ async function syncFromCloud() {
       .select('*')
       .eq('user_id', _user.id)
       .order('created_at', { ascending: true });
-    if (!rows?.length) return;
+
+    // Clear existing local food data before writing cloud data
+    Object.keys(localStorage).forEach(k => {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k)) localStorage.removeItem(k);
+    });
+
+    if (!rows?.length) { render(); return; }
+
     // Group by date and save to localStorage
     const byDate = {};
     rows.forEach(r => {
