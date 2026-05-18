@@ -85,7 +85,7 @@ export default async function handler(req, res) {
     console.error(e);
     const msg = e.message || '';
     if (msg === 'rate_limited' || msg.includes('429') || msg.includes('Too Many') || msg.includes('rate')) {
-      return res.status(429).json({ error: '请求太频繁，请等一分钟后再试' });
+      return res.status(429).json({ error: 'Too many requests — please try again in a moment' });
     }
     return res.status(500).json({ error: e.message || 'Internal server error' });
   }

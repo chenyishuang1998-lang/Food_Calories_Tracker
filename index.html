@@ -751,7 +751,7 @@ async function handlePhoto(event) {
   }
 
   const apiKey = localStorage.getItem('openrouterKey');
-  if (!apiKey) { openSettings(); showToast('请先设置 OpenRouter API Key'); return; }
+  if (!apiKey) { openSettings(); showToast('Set your OpenRouter API key first'); return; }
 
   // Show loading
   document.getElementById('albumBtnInner').innerHTML = '<span class="spinner"></span> Identifying…';
@@ -1059,7 +1059,7 @@ async function snapPhoto() {
   closeCamera();
 
   const apiKey = localStorage.getItem('openrouterKey');
-  if (!apiKey) { openSettings(); showToast('请先设置 OpenRouter API Key'); return; }
+  if (!apiKey) { openSettings(); showToast('Set your OpenRouter API key first'); return; }
 
   document.getElementById('cameraBtnInner').innerHTML = '<span class="spinner"></span> Identifying…';
   document.getElementById('cameraBtn').disabled = true;
