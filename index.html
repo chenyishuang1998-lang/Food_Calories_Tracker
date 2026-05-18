@@ -558,7 +558,7 @@ async function initAuth() {
         });
         if (data?.user) {
           setUser(data.user);
-          syncFromCloud();
+          await syncFromCloud();
           showApp();
         }
       } catch(e) { console.error('setSession error:', e); }
