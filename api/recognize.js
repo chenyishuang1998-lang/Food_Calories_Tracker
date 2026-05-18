@@ -35,7 +35,7 @@ async function recognize(provider, apiKey, base64, mediaType) {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'google/gemma-4-27b-it:free',
+        model: 'google/gemma-4-26b-a4b-it:free',
         messages: [{ role: 'user', content: [
           { type: 'image_url', image_url: { url: `data:${mediaType || 'image/jpeg'};base64,${base64}` } },
           { type: 'text', text: PROMPT }
