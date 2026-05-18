@@ -571,6 +571,7 @@ async function initAuth() {
   const { data: { session } } = await _supa.auth.getSession();
   if (session) {
     setUser(session.user);
+    await syncFromCloud();
     showApp();
   } else if (localStorage.getItem('skippedLogin')) {
     showApp();
@@ -578,10 +579,10 @@ async function initAuth() {
     showLoginPage();
   }
 
-  _supa.auth.onAuthStateChange((event, session) => {
+  _supa.auth.onAuthStateChange(async (event, session) => {
     if (session) {
       setUser(session.user);
-      if (event === 'SIGNED_IN') { syncFromCloud(); showApp(); }
+      if (event === 'SIGNED_IN') { await syncFromCloud(); showApp(); }
     } else {
       setUser(null);
     }
@@ -692,7 +693,7 @@ async function syncFromCloud() {
     const byDate = {};
     rows.forEach(r => {
       if (!byDate[r.date]) byDate[r.date] = [];
-      byDate[r.date].push({ id: Date.now() + Math.random(), name: r.name, cal: r.cal, meal: r.meal, emoji: r.emoji });
+      byDate[r.date].push({ id: `cloud_${r.id || r.date + r.name + r.meal}`, name: r.name, cal: r.cal, meal: r.meal, emoji: r.emoji });
     });
     Object.entries(byDate).forEach(([date, items]) => {
       localStorage.setItem(date, JSON.stringify(items));
