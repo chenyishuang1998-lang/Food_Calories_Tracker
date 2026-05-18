@@ -27,6 +27,24 @@ async function recognize(provider, apiKey, base64, mediaType) {
     const data = await res.json();
     if (data.error) throw new Error(data.error.message);
     return (data.candidates?.[0]?.content?.parts?.[0]?.text || '').replace(/```json|```/g, '').trim();
+  } else if (provider === 'openrouter') {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-2.0-flash-exp:free',
+        messages: [{ role: 'user', content: [
+          { type: 'image_url', image_url: { url: `data:${mediaType || 'image/jpeg'};base64,${base64}` } },
+          { type: 'text', text: PROMPT }
+        ]}]
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    return (data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim();
   } else {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
