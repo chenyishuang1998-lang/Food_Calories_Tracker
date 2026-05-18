@@ -66,6 +66,26 @@
     .page.active { display: block; }
     .main { padding: 20px; max-width: 560px; margin: 0 auto; }
 
+    /* Edit modal */
+    .edit-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:200; align-items:center; justify-content:center; padding:20px; }
+    .edit-overlay.open { display:flex; }
+    .edit-card { background:var(--surface); border-radius:16px; padding:24px; width:100%; max-width:360px; }
+    .edit-card h3 { margin:0 0 16px; font-size:17px; }
+    .edit-field { display:flex; flex-direction:column; gap:4px; margin-bottom:12px; }
+    .edit-field label { font-size:12px; color:var(--muted); }
+    .edit-field input, .edit-field select { background:var(--surface2); border:none; border-radius:8px; padding:10px 12px; color:var(--text); font-size:15px; font-family:inherit; }
+    .edit-actions { display:flex; gap:8px; margin-top:16px; }
+    .edit-actions button { flex:1; padding:12px; border:none; border-radius:10px; font-size:15px; font-weight:500; cursor:pointer; font-family:inherit; }
+    .edit-save { background:var(--blue); color:white; }
+    .edit-cancel { background:var(--surface2); color:var(--text); }
+    .login-page { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 20px; text-align: center; }
+    .login-logo { font-size: 56px; font-weight: 700; letter-spacing: -2px; margin-bottom: 8px; }
+    .login-tagline { color: var(--muted); font-size: 15px; margin-bottom: 48px; }
+    .login-google-btn { display: flex; align-items: center; gap: 10px; background: white; color: #1f1f1f; border: none; border-radius: 12px; padding: 14px 28px; font-size: 16px; font-weight: 500; cursor: pointer; font-family: inherit; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: opacity .15s; }
+    .login-google-btn:active { opacity: .8; }
+    .login-google-icon { width: 20px; height: 20px; }
+    .login-skip { margin-top: 20px; color: var(--muted); font-size: 13px; cursor: pointer; background: none; border: none; font-family: inherit; text-decoration: underline; }
+
     /* Stats hero */
     .stats-hero { display: flex; align-items: center; gap: 20px; padding: 20px 0 14px; }
     .ring-wrap { position: relative; width: 80px; height: 80px; flex-shrink: 0; }
@@ -278,7 +298,19 @@
   </style>
 </head>
 <body>
+<!-- Login page -->
+<div id="loginPage" class="login-page" style="display:none">
+  <div class="login-logo">Kcal</div>
+  <div class="login-tagline">Track your daily calories with ease</div>
+  <button class="login-google-btn" onclick="handleAuth()">
+    <svg class="login-google-icon" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+    Sign in with Google
+  </button>
+  <button class="login-skip" onclick="skipLogin()">Continue without account</button>
+</div>
 
+<!-- Main app -->
+<div id="mainApp" style="display:none">
 <div class="header">
   <div class="logo" onclick="showPage('tracker')" style="cursor:pointer">Kcal</div>
   <div class="header-right">
@@ -396,6 +428,34 @@
 </div>
 
 <!-- Settings sheet -->
+<!-- Edit food modal -->
+<div class="edit-overlay" id="editOverlay" onclick="closeEditIfBg(event)">
+  <div class="edit-card">
+    <h3>Edit Food</h3>
+    <div class="edit-field">
+      <label>Name</label>
+      <input id="editName" type="text" />
+    </div>
+    <div class="edit-field">
+      <label>Calories (kcal)</label>
+      <input id="editCal" type="number" min="0" />
+    </div>
+    <div class="edit-field">
+      <label>Meal</label>
+      <select id="editMeal">
+        <option value="breakfast">🌅 Breakfast</option>
+        <option value="lunch">☀️ Lunch</option>
+        <option value="dinner">🌙 Dinner</option>
+        <option value="snack">🍎 Snack</option>
+      </select>
+    </div>
+    <div class="edit-actions">
+      <button class="edit-cancel" onclick="closeEdit()">Cancel</button>
+      <button class="edit-save" onclick="saveEdit()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="settingsOverlay" onclick="closeSettingsIfBg(event)">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -438,6 +498,8 @@
   </div>
 </div>
 
+</div><!-- /mainApp -->
+
 <script>
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const _supa = supabase.createClient('https://gaylozwyejdszpjamaiw.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdheWxvend5ZWpkc3pwamFtYWl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MjM3OTksImV4cCI6MjA5NDE5OTc5OX0.S4z5yFxS5_smwkXOBpjxJJ062s7u4pVihQwnf3nWzXU', {
@@ -448,6 +510,21 @@ const _supa = supabase.createClient('https://gaylozwyejdszpjamaiw.supabase.co', 
   }
 });
 let _user = null;
+
+function showLoginPage() {
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+}
+
+function skipLogin() {
+  localStorage.setItem('skippedLogin', '1');
+  showApp();
+}
 
 async function initAuth() {
   // Parse access_token from URL hash manually if present
@@ -465,6 +542,7 @@ async function initAuth() {
         if (data?.user) {
           setUser(data.user);
           syncFromCloud();
+          showApp();
         }
       } catch(e) { console.error('setSession error:', e); }
     }
@@ -476,12 +554,17 @@ async function initAuth() {
   const { data: { session } } = await _supa.auth.getSession();
   if (session) {
     setUser(session.user);
+    showApp();
+  } else if (localStorage.getItem('skippedLogin')) {
+    showApp();
+  } else {
+    showLoginPage();
   }
 
   _supa.auth.onAuthStateChange((event, session) => {
     if (session) {
       setUser(session.user);
-      if (event === 'SIGNED_IN') syncFromCloud();
+      if (event === 'SIGNED_IN') { syncFromCloud(); showApp(); }
     } else {
       setUser(null);
     }
@@ -509,11 +592,12 @@ async function handleAuth() {
   if (_user) {
     await _supa.auth.signOut();
     setUser(null);
-    // Clear all food data from localStorage on sign out
+    localStorage.removeItem('skippedLogin');
     Object.keys(localStorage).forEach(k => {
       if (/^\d{4}-\d{2}-\d{2}$/.test(k)) localStorage.removeItem(k);
     });
     render();
+    showLoginPage();
   } else {
     await _supa.auth.signInWithOAuth({
       provider: 'google',
@@ -718,6 +802,7 @@ function render() {
               <span class="food-emoji">${f.emoji||'🍽️'}</span>
               <span class="food-name-text">${f.name}</span>
               <span class="food-kcal">${f.cal}</span>
+              <button class="food-del" style="margin-right:2px;background:var(--surface2);color:var(--text)" onclick="openEdit(${f.id})">✎</button>
               <button class="food-del" onclick="deleteFood(${f.id})">✕</button>
             </div>`).join('')}
       </div>` : ''}
@@ -747,6 +832,39 @@ function deleteFood(id) {
   const key = keyByOffset(offset);
   saveData(key, getData(key).filter(f => f.id !== id));
   render();
+}
+
+let _editId = null;
+function openEdit(id) {
+  const key = keyByOffset(offset);
+  const item = getData(key).find(f => f.id === id);
+  if (!item) return;
+  _editId = id;
+  document.getElementById('editName').value = item.name;
+  document.getElementById('editCal').value = item.cal;
+  document.getElementById('editMeal').value = item.meal;
+  document.getElementById('editOverlay').classList.add('open');
+}
+
+function closeEdit() {
+  _editId = null;
+  document.getElementById('editOverlay').classList.remove('open');
+}
+
+function closeEditIfBg(e) { if (e.target === document.getElementById('editOverlay')) closeEdit(); }
+
+function saveEdit() {
+  if (!_editId) return;
+  const name = document.getElementById('editName').value.trim();
+  const cal = parseInt(document.getElementById('editCal').value);
+  const meal = document.getElementById('editMeal').value;
+  if (!name || isNaN(cal)) { showToast('Please fill in all fields'); return; }
+  const key = keyByOffset(offset);
+  const data = getData(key).map(f => f.id === _editId ? { ...f, name, cal, meal, emoji: f.emoji || getEmoji(name) } : f);
+  saveData(key, data);
+  closeEdit();
+  render();
+  showToast('Updated');
 }
 
 function toggleMeal(k) { openMeals[k] = !openMeals[k]; render(); }
