@@ -545,41 +545,6 @@ function skipLogin() {
 }
 
 async function initAuth() {
-  // Parse access_token from URL hash manually if present
-  const hash = window.location.hash;
-  if (hash && hash.includes('access_token')) {
-    const params = new URLSearchParams(hash.slice(1));
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-    if (accessToken) {
-      try {
-        const { data, error } = await _supa.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken || ''
-        });
-        if (data?.user) {
-          setUser(data.user);
-          await syncFromCloud();
-          showApp();
-        }
-      } catch(e) { console.error('setSession error:', e); }
-    }
-    history.replaceState(null, '', window.location.pathname);
-    return;
-  }
-
-  // No hash — check existing session
-  const { data: { session } } = await _supa.auth.getSession();
-  if (session) {
-    setUser(session.user);
-    await syncFromCloud();
-    showApp();
-  } else if (localStorage.getItem('skippedLogin')) {
-    showApp();
-  } else {
-    showLoginPage();
-  }
-
   _supa.auth.onAuthStateChange(async (event, session) => {
     console.log('[auth] event:', event, 'session:', !!session);
     if (session) {
@@ -590,6 +555,11 @@ async function initAuth() {
       }
     } else {
       setUser(null);
+      if (localStorage.getItem('skippedLogin')) {
+        showApp();
+      } else {
+        showLoginPage();
+      }
     }
   });
 }
