@@ -10,45 +10,29 @@ export const config = {
 const PROMPT = 'Identify all foods in this image. Return only raw JSON, no markdown: {"items":[{"name":"food name","cal":integer_kcal,"emoji":"single emoji"}]}. Estimate kcal for visible portion. List every distinct food item.';
 
 async function recognize(apiKey, base64, mediaType) {
-  const models = [
-    'google/gemma-4-26b-a4b-it:free',
-    'google/gemma-4-31b-it:free',
-    'meta-llama/llama-4-maverick:free',
-    'qwen/qwen2.5-vl-32b-instruct:free',
-  ];
-  let lastError;
-  for (const model of models) {
-    try {
-      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: 'user', content: [
-            { type: 'image_url', image_url: { url: `data:${mediaType || 'image/jpeg'};base64,${base64}` } },
-            { type: 'text', text: PROMPT }
-          ]}]
-        })
-      });
-      const data = await res.json();
-      if (data.error) {
-        const errMsg = data.error.message || '';
-        if (errMsg.includes('429') || errMsg.includes('rate') || errMsg.includes('Too Many')) {
-          lastError = new Error('rate_limited');
-        } else {
-          lastError = new Error(errMsg);
-        }
-        continue;
-      }
-      return (data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim();
-    } catch (e) {
-      lastError = e;
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'openrouter/free',
+      messages: [{ role: 'user', content: [
+        { type: 'image_url', image_url: { url: `data:${mediaType || 'image/jpeg'};base64,${base64}` } },
+        { type: 'text', text: PROMPT }
+      ]}]
+    })
+  });
+  const data = await res.json();
+  if (data.error) {
+    const msg = data.error.message || '';
+    if (msg.includes('429') || msg.includes('rate') || msg.includes('Too Many') || res.status === 429) {
+      throw new Error('rate_limited');
     }
+    throw new Error(msg);
   }
-  throw lastError || new Error('All models failed');
+  return (data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim();
 }
 
 function parseMultipart(req) {
