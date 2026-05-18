@@ -287,11 +287,17 @@
     @keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(6px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
 
     /* Auth */
-    .auth-bar { display:flex; align-items:center; justify-content:space-between; padding:10px 20px; background:var(--surface); border-bottom:1px solid var(--border); font-size:13px; }
-    .auth-bar .user-info { display:flex; align-items:center; gap:8px; color:var(--muted); }
-    .auth-bar .user-avatar { width:24px; height:24px; border-radius:50%; }
-    .auth-btn { background:var(--text); color:#fff; border:none; border-radius:var(--r-sm); padding:6px 14px; font-size:12px; font-family:inherit; cursor:pointer; }
-    .auth-btn.ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+    .auth-bar { display:none; }
+    .user-avatar { width:28px; height:28px; border-radius:50%; cursor:pointer; border:2px solid var(--border); }
+    .user-btn { display:flex; align-items:center; gap:6px; background:var(--surface2); border:none; border-radius:20px; padding:4px 10px 4px 4px; cursor:pointer; font-size:13px; color:var(--text); font-family:inherit; position:relative; }
+    .user-btn .user-initial { width:28px; height:28px; border-radius:50%; background:var(--blue); color:white; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; }
+    .user-dropdown { display:none; position:absolute; top:calc(100% + 8px); right:0; background:var(--surface); border:1px solid var(--border); border-radius:12px; min-width:180px; box-shadow:0 8px 24px rgba(0,0,0,.2); z-index:100; overflow:hidden; }
+    .user-dropdown.open { display:block; }
+    .user-dropdown-name { padding:12px 14px 8px; font-size:13px; color:var(--muted); border-bottom:1px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .user-dropdown-item { display:flex; align-items:center; gap:8px; padding:11px 14px; font-size:14px; cursor:pointer; color:var(--text); }
+    .user-dropdown-item:hover { background:var(--surface2); }
+    .sync-dot { width:7px; height:7px; border-radius:50%; background:var(--green); display:inline-block; margin-left:2px; }
+    .sync-dot.syncing { background:var(--amber); animation:pulse 1s infinite; }
     .sync-dot { width:6px; height:6px; border-radius:50%; background:var(--green); display:inline-block; }
     .sync-dot.syncing { background:var(--amber); animation: pulse 1s infinite; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
@@ -321,6 +327,17 @@
     </div>
     <button class="icon-btn" id="calPageBtn" onclick="toggleCalendar()" title="History">&#128197;</button>
     <button class="icon-btn" onclick="openSettings()" title="Settings">&#9881;</button>
+    <div id="userBtnWrap" style="position:relative;display:none">
+      <button class="user-btn" id="userBtn" onclick="toggleUserDropdown()">
+        <div class="user-initial" id="userInitial">?</div>
+        <span id="userShortName"></span>
+        <span id="syncDot" class="sync-dot" style="display:none"></span>
+      </button>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="user-dropdown-name" id="userFullName"></div>
+        <div class="user-dropdown-item" onclick="handleSignOut()">↪ Sign out</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -573,43 +590,60 @@ async function initAuth() {
 
 function setUser(user) {
   _user = user;
-  const bar = document.getElementById('authBar');
-  const info = document.getElementById('userInfo');
-  const btn = document.getElementById('authBtn');
+  const wrap = document.getElementById('userBtnWrap');
   if (user) {
+    const name = user.user_metadata?.full_name || user.email || '';
     const avatar = user.user_metadata?.avatar_url;
-    info.innerHTML = `${avatar ? `<img class="user-avatar" src="${avatar}" />` : ''}<span>${user.user_metadata?.full_name || user.email}</span><span class="sync-dot" id="syncDot"></span>`;
-    btn.textContent = 'Sign out';
-    btn.className = 'auth-btn ghost';
+    const initial = name.charAt(0).toUpperCase();
+    const shortName = name.split(' ')[0];
+    const initialEl = document.getElementById('userInitial');
+    if (avatar) {
+      initialEl.innerHTML = `<img src="${avatar}" style="width:28px;height:28px;border-radius:50%;object-fit:cover" />`;
+    } else {
+      initialEl.textContent = initial;
+    }
+    document.getElementById('userShortName').textContent = shortName;
+    document.getElementById('userFullName').textContent = name;
+    document.getElementById('syncDot').style.display = 'inline-block';
+    wrap.style.display = 'block';
   } else {
-    info.innerHTML = '<span style="color:var(--muted)">Not signed in — data saved locally</span>';
-    btn.textContent = 'Sign in with Google';
-    btn.className = 'auth-btn';
+    wrap.style.display = 'none';
+    document.getElementById('userDropdown').classList.remove('open');
   }
 }
 
-async function handleAuth() {
-  if (_user) {
-    // Wait for any pending sync to finish before signing out
-    const dot = document.getElementById('syncDot');
-    if (dot?.classList.contains('syncing')) {
-      showToast('Syncing… please wait');
-    }
-    await _pendingSync;
-    await _supa.auth.signOut();
-    setUser(null);
-    localStorage.removeItem('skippedLogin');
-    Object.keys(localStorage).forEach(k => {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(k)) localStorage.removeItem(k);
-    });
-    render();
-    showLoginPage();
-  } else {
-    await _supa.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: window.location.origin }
-    });
+function toggleUserDropdown() {
+  document.getElementById('userDropdown').classList.toggle('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('userBtnWrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('userDropdown').classList.remove('open');
   }
+});
+
+async function handleSignOut() {
+  document.getElementById('userDropdown').classList.remove('open');
+  const dot = document.getElementById('syncDot');
+  if (dot?.classList.contains('syncing')) showToast('Syncing… please wait');
+  await _pendingSync;
+  await _supa.auth.signOut();
+  setUser(null);
+  localStorage.removeItem('skippedLogin');
+  Object.keys(localStorage).forEach(k => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(k)) localStorage.removeItem(k);
+  });
+  render();
+  showLoginPage();
+}
+
+async function handleAuth() {
+  await _supa.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin }
+  });
 }
 
 let _pendingSync = Promise.resolve();
