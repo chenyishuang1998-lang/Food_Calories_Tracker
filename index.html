@@ -401,58 +401,8 @@
     <div class="sheet-handle"></div>
     <div class="sheet-title">Settings</div>
 
-    <!-- AI Provider selector -->
+    <!-- AI Provider key -->
     <div class="setting-row">
-      <div class="setting-label">AI Provider</div>
-      <select id="providerSel" onchange="switchProvider(this.value)" style="width:140px">
-        <option value="anthropic">Anthropic (Claude)</option>
-        <option value="gemini">Google Gemini</option>
-        <option value="openrouter">OpenRouter (Free)</option>
-      </select>
-    </div>
-
-    <!-- Anthropic key -->
-    <div class="setting-row" id="anthropicRow">
-      <div>
-        <div class="setting-label">Anthropic API Key</div>
-        <div class="setting-desc"><a href="https://console.anthropic.com" target="_blank" style="color:var(--blue)">console.anthropic.com ↗</a></div>
-      </div>
-      <div style="text-align:right">
-        <div class="key-status unset" id="anthropicStatus">Not set</div>
-        <button class="btn-text" onclick="toggleKeyInput('anthropic')" style="margin-top:3px" id="anthropicToggleBtn">Set key</button>
-      </div>
-    </div>
-    <div id="anthropicKeyWrap" style="display:none">
-      <div class="key-input-row">
-        <input type="password" id="anthropicKeyInput" placeholder="sk-ant-…" autocomplete="off" />
-        <button class="btn-sm" onclick="saveKey('anthropic')">Save</button>
-        <button class="btn-sm ghost" onclick="clearKey('anthropic')">Clear</button>
-      </div>
-      <div class="key-hint">Stored locally on device only</div>
-    </div>
-
-    <!-- Gemini key -->
-    <div class="setting-row" id="geminiRow" style="display:none">
-      <div>
-        <div class="setting-label">Gemini API Key</div>
-        <div class="setting-desc"><a href="https://aistudio.google.com" target="_blank" style="color:var(--blue)">aistudio.google.com ↗</a> · Free</div>
-      </div>
-      <div style="text-align:right">
-        <div class="key-status unset" id="geminiStatus">Not set</div>
-        <button class="btn-text" onclick="toggleKeyInput('gemini')" style="margin-top:3px" id="geminiToggleBtn">Set key</button>
-      </div>
-    </div>
-    <div id="geminiKeyWrap" style="display:none">
-      <div class="key-input-row">
-        <input type="password" id="geminiKeyInput" placeholder="AIza…" autocomplete="off" />
-        <button class="btn-sm" onclick="saveKey('gemini')">Save</button>
-        <button class="btn-sm ghost" onclick="clearKey('gemini')">Clear</button>
-      </div>
-      <div class="key-hint">Stored locally on device only</div>
-    </div>
-
-    <!-- OpenRouter key -->
-    <div class="setting-row" id="openrouterRow" style="display:none">
       <div>
         <div class="setting-label">OpenRouter API Key</div>
         <div class="setting-desc"><a href="https://openrouter.ai/keys" target="_blank" style="color:var(--blue)">openrouter.ai ↗</a> · Free models available</div>
@@ -800,9 +750,8 @@ async function handlePhoto(event) {
     return;
   }
 
-  const provider = localStorage.getItem('aiProvider') || 'anthropic';
-  const apiKey = localStorage.getItem(provider + 'Key');
-  if (!apiKey) { openSettings(); showToast('Set your API key first'); return; }
+  const apiKey = localStorage.getItem('openrouterKey');
+  if (!apiKey) { openSettings(); showToast('请先设置 OpenRouter API Key'); return; }
 
   // Show loading
   document.getElementById('albumBtnInner').innerHTML = '<span class="spinner"></span> Identifying…';
@@ -813,7 +762,6 @@ async function handlePhoto(event) {
     // Send file directly as multipart - bypasses all iOS Safari base64 restrictions
     const formData = new FormData();
     formData.append('image', file);
-    formData.append('provider', provider);
     formData.append('apiKey', apiKey);
     const res = await fetch('/api/recognize', { method: 'POST', body: formData });
     const parsed = await res.json();
@@ -858,32 +806,17 @@ function askAI() {
 function openSettings() {
   refreshKeyStatus();
   document.getElementById('goalSheetSel').value = goal;
-  const provider = localStorage.getItem('aiProvider') || 'anthropic';
-  document.getElementById('providerSel').value = provider;
-  switchProvider(provider);
   document.getElementById('settingsOverlay').classList.add('open');
 }
 function closeSettings() { document.getElementById('settingsOverlay').classList.remove('open'); }
 function closeSettingsIfBg(e) { if (e.target === document.getElementById('settingsOverlay')) closeSettings(); }
 
-function switchProvider(provider) {
-  localStorage.setItem('aiProvider', provider);
-  document.getElementById('anthropicRow').style.display = provider === 'anthropic' ? 'flex' : 'none';
-  document.getElementById('geminiRow').style.display = provider === 'gemini' ? 'flex' : 'none';
-  document.getElementById('openrouterRow').style.display = provider === 'openrouter' ? 'flex' : 'none';
-  document.getElementById('anthropicKeyWrap').style.display = 'none';
-  document.getElementById('geminiKeyWrap').style.display = 'none';
-  document.getElementById('openrouterKeyWrap').style.display = 'none';
-}
-
 function refreshKeyStatus() {
-  ['anthropic', 'gemini', 'openrouter'].forEach(p => {
-    const has = !!localStorage.getItem(p + 'Key');
-    const el = document.getElementById(p + 'Status');
-    el.textContent = has ? '● Set' : 'Not set';
-    el.className = 'key-status ' + (has ? 'set' : 'unset');
-    document.getElementById(p + 'ToggleBtn').textContent = has ? 'Change' : 'Set key';
-  });
+  const has = !!localStorage.getItem('openrouterKey');
+  const el = document.getElementById('openrouterStatus');
+  el.textContent = has ? '● Set' : 'Not set';
+  el.className = 'key-status ' + (has ? 'set' : 'unset');
+  document.getElementById('openrouterToggleBtn').textContent = has ? 'Change' : 'Set key';
 }
 
 function toggleKeyInput(provider) {
@@ -894,12 +827,6 @@ function toggleKeyInput(provider) {
 function saveKey(provider) {
   const input = document.getElementById(provider + 'KeyInput');
   const v = input.value.trim();
-  if (provider === 'anthropic' && !v.startsWith('sk-ant-')) {
-    showToast('Anthropic key should start with sk-ant-'); return;
-  }
-  if (provider === 'gemini' && !v.startsWith('AIza')) {
-    showToast('Gemini key should start with AIza'); return;
-  }
   if (provider === 'openrouter' && !v.startsWith('sk-or-')) {
     showToast('OpenRouter key should start with sk-or-'); return;
   }
@@ -1131,9 +1058,8 @@ async function snapPhoto() {
 
   closeCamera();
 
-  const provider = localStorage.getItem('aiProvider') || 'anthropic';
-  const apiKey = localStorage.getItem(provider + 'Key');
-  if (!apiKey) { openSettings(); showToast('Set your API key first'); return; }
+  const apiKey = localStorage.getItem('openrouterKey');
+  if (!apiKey) { openSettings(); showToast('请先设置 OpenRouter API Key'); return; }
 
   document.getElementById('cameraBtnInner').innerHTML = '<span class="spinner"></span> Identifying…';
   document.getElementById('cameraBtn').disabled = true;
@@ -1143,7 +1069,7 @@ async function snapPhoto() {
     const res = await fetch('/api/recognize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ provider, apiKey, base64, mediaType: 'image/jpeg' })
+      body: JSON.stringify({ apiKey, base64, mediaType: 'image/jpeg' })
     });
     const parsed = await res.json();
     if (!res.ok) throw new Error(parsed.error || 'Server error');
