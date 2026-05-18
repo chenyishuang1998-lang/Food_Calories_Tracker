@@ -332,11 +332,12 @@
     <div class="add-section">
       <div class="section-label">Add food</div>
       <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" onchange="handlePhoto(event)" />
+      <input type="file" id="albumInput" accept="image/jpeg,image/png,image/webp" onchange="handlePhoto(event)" />
       <div class="photo-row">
         <button class="photo-btn" id="cameraBtn" onclick="openCamera()">
           <span id="cameraBtnInner">📷 Take Photo</span>
         </button>
-        <button class="photo-btn" id="albumBtn" onclick="showToast('Use Take Photo on iOS — library upload not supported by Safari')">
+        <button class="photo-btn" id="albumBtn" onclick="openAlbum()">
           <span id="albumBtnInner">🖼️ From Library</span>
         </button>
       </div>
@@ -1045,6 +1046,10 @@ function renderDayDetail(dateKey) {
 // ── Camera stream ────────────────────────────────────────────────────────────
 let cameraStream = null;
 
+function openAlbum() {
+  document.getElementById('albumInput').click();
+}
+
 async function openCamera() {
   const modal = document.getElementById('cameraModal');
   modal.style.display = 'flex';
@@ -1089,7 +1094,6 @@ async function snapPhoto() {
   try {
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
     base64 = dataUrl.split(',')[1];
-    showToast(`Canvas: ${cw}x${ch}, base64: ${base64?.length || 0} chars`);
   } catch(canvasErr) {
     showToast('Canvas error: ' + canvasErr.message);
     return;
@@ -1154,6 +1158,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 // ── Init ──────────────────────────────────────────────────────────────────────
 refreshKeyStatus();
 render();
+initAuth();
 </script>
 </body>
 </html>
