@@ -536,6 +536,7 @@ function showLoginPage() {
 function showApp() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
+  render();
 }
 
 function skipLogin() {
@@ -693,7 +694,7 @@ async function syncFromCloud() {
     const byDate = {};
     rows.forEach(r => {
       if (!byDate[r.date]) byDate[r.date] = [];
-      byDate[r.date].push({ id: `cloud_${r.id || r.date + r.name + r.meal}`, name: r.name, cal: r.cal, meal: r.meal, emoji: r.emoji });
+      byDate[r.date].push({ id: r.id, name: r.name, cal: r.cal, meal: r.meal, emoji: r.emoji });
     });
     Object.entries(byDate).forEach(([date, items]) => {
       localStorage.setItem(date, JSON.stringify(items));
@@ -847,8 +848,8 @@ function render() {
               <span class="food-emoji">${f.emoji||'🍽️'}</span>
               <span class="food-name-text">${f.name}</span>
               <span class="food-kcal">${f.cal}</span>
-              <button class="food-del" style="margin-right:2px;background:var(--surface2);color:var(--text)" onclick="openEdit(${f.id})">✎</button>
-              <button class="food-del" onclick="deleteFood(${f.id})">✕</button>
+              <button class="food-del" style="margin-right:2px;background:var(--surface2);color:var(--text)" onclick="openEdit('${f.id}')">✎</button>
+              <button class="food-del" onclick="deleteFood('${f.id}')">✕</button>
             </div>`).join('')}
       </div>` : ''}
     `;
@@ -875,14 +876,14 @@ function addFood() {
 
 function deleteFood(id) {
   const key = keyByOffset(offset);
-  saveData(key, getData(key).filter(f => f.id !== id));
+  saveData(key, getData(key).filter(f => String(f.id) !== String(id)));
   render();
 }
 
 let _editId = null;
 function openEdit(id) {
   const key = keyByOffset(offset);
-  const item = getData(key).find(f => f.id === id);
+  const item = getData(key).find(f => String(f.id) === String(id));
   if (!item) return;
   _editId = id;
   document.getElementById('editName').value = item.name;
@@ -905,7 +906,7 @@ function saveEdit() {
   const meal = document.getElementById('editMeal').value;
   if (!name || isNaN(cal)) { showToast('Please fill in all fields'); return; }
   const key = keyByOffset(offset);
-  const data = getData(key).map(f => f.id === _editId ? { ...f, name, cal, meal, emoji: f.emoji || getEmoji(name) } : f);
+  const data = getData(key).map(f => String(f.id) === String(_editId) ? { ...f, name, cal, meal, emoji: f.emoji || getEmoji(name) } : f);
   saveData(key, data);
   closeEdit();
   render();
