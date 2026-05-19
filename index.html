@@ -549,10 +549,10 @@ async function initAuth() {
     console.log('[auth] event:', event, 'session:', !!session);
     if (session) {
       setUser(session.user);
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        showApp();
+      if (event === 'SIGNED_IN') {
         syncFromCloud();
       }
+      showApp();
     } else {
       setUser(null);
       if (localStorage.getItem('skippedLogin')) {
