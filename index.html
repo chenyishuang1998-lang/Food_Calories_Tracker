@@ -829,6 +829,7 @@ function getEmoji(name) {
 function changeDay(dir) {
   if (offset + dir > 0) return;
   offset += dir;
+  loadBmrForCurrentDate();
   render();
 }
 
@@ -1520,22 +1521,50 @@ function showToast(msg) {
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
 // ── BMR + Exercise + Deficit ──────────────────────────────────────────────────
-let bmr = parseInt(localStorage.getItem('bmr') || '0');
+let bmr = 0;
+
+function getBmrKey(dateKey) { return 'bmr_' + (dateKey || keyByOffset(offset)); }
+
+function getBmrForDate(dateKey) {
+  // Look for BMR on this date or the most recent previous date
+  const key = dateKey || keyByOffset(offset);
+  const stored = localStorage.getItem(getBmrKey(key));
+  if (stored) return JSON.parse(stored);
+  // Walk back up to 30 days to find the most recent profile
+  const d = new Date(key);
+  for (let i = 1; i <= 30; i++) {
+    d.setDate(d.getDate() - 1);
+    const prevKey = localDateKey(d);
+    const prev = localStorage.getItem(getBmrKey(prevKey));
+    if (prev) return JSON.parse(prev);
+  }
+  // Fall back to global bmr key (legacy)
+  const legacyBmr = parseInt(localStorage.getItem('bmr') || '0');
+  if (legacyBmr) return { bmr: legacyBmr, height: parseFloat(localStorage.getItem('bmrHeight')), weight: parseFloat(localStorage.getItem('bmrWeight')), age: parseInt(localStorage.getItem('bmrAge')), sex: localStorage.getItem('bmrSex') };
+  return null;
+}
+
+function loadBmrForCurrentDate() {
+  const profile = getBmrForDate(keyByOffset(offset));
+  bmr = profile?.bmr || 0;
+}
 let exercises = JSON.parse(localStorage.getItem('exercises_' + todayKey()) || '[]');
-async function saveBmr(val) {
+async function saveBmr(val, h, w, a, s) {
+  const dateKey = keyByOffset(offset);
+  const profile = { bmr: val, height: h, weight: w, age: a, sex: s };
   bmr = val;
-  localStorage.setItem('bmr', val);
+  localStorage.setItem(getBmrKey(dateKey), JSON.stringify(profile));
   updateDeficit();
-  // Sync BMR to cloud
+  // Sync to cloud
   if (_user) {
     try {
       await _supa.from('user_profiles').upsert({
         user_id: _user.id,
         bmr: val,
-        height: parseFloat(localStorage.getItem('bmrHeight')) || null,
-        weight: parseFloat(localStorage.getItem('bmrWeight')) || null,
-        age: parseInt(localStorage.getItem('bmrAge')) || null,
-        sex: localStorage.getItem('bmrSex') || null,
+        height: h || null,
+        weight: w || null,
+        age: a || null,
+        sex: s || null,
         updated_at: new Date().toISOString()
       });
     } catch(e) { console.error('BMR sync error:', e); }
@@ -1560,13 +1589,14 @@ async function syncProfileFromCloud() {
   if (!_user) return;
   try {
     const { data } = await _supa.from('user_profiles').select('*').eq('user_id', _user.id).single();
-    if (data) {
-      bmr = data.bmr || 0;
-      localStorage.setItem('bmr', bmr);
-      if (data.height) localStorage.setItem('bmrHeight', data.height);
-      if (data.weight) localStorage.setItem('bmrWeight', data.weight);
-      if (data.age) localStorage.setItem('bmrAge', data.age);
-      if (data.sex) localStorage.setItem('bmrSex', data.sex);
+    if (data && data.bmr) {
+      // Store as today's profile if no local data exists
+      const todayKey2 = todayKey();
+      if (!localStorage.getItem(getBmrKey(todayKey2))) {
+        const profile = { bmr: data.bmr, height: data.height, weight: data.weight, age: data.age, sex: data.sex };
+        localStorage.setItem(getBmrKey(todayKey2), JSON.stringify(profile));
+      }
+      loadBmrForCurrentDate();
     }
   } catch(e) { console.error('Profile sync error:', e); }
 }
@@ -1612,14 +1642,11 @@ function updateDeficit() {
 
 // BMR modal
 function openBmrModal() {
-  const h = localStorage.getItem('bmrHeight');
-  const w = localStorage.getItem('bmrWeight');
-  const a = localStorage.getItem('bmrAge');
-  const s = localStorage.getItem('bmrSex');
-  if (h) document.getElementById('bmrHeight').value = h;
-  if (w) document.getElementById('bmrWeight').value = w;
-  if (a) document.getElementById('bmrAge').value = a;
-  if (s) document.getElementById('bmrSex').value = s;
+  const profile = getBmrForDate(keyByOffset(offset));
+  if (profile?.height) document.getElementById('bmrHeight').value = profile.height;
+  if (profile?.weight) document.getElementById('bmrWeight').value = profile.weight;
+  if (profile?.age) document.getElementById('bmrAge').value = profile.age;
+  if (profile?.sex) document.getElementById('bmrSex').value = profile.sex;
   document.getElementById('bmrOverlay').classList.add('open');
 }
 function closeBmrModal() { document.getElementById('bmrOverlay').classList.remove('open'); }
@@ -1631,16 +1658,11 @@ async function calcBmr() {
   const s = document.getElementById('bmrSex').value;
   if (!h || !w || !a) { showToast('Please fill in all fields'); return; }
 
-  // Mifflin-St Jeor formula
   const calc = s === 'male'
     ? Math.round(10 * w + 6.25 * h - 5 * a + 5)
     : Math.round(10 * w + 6.25 * h - 5 * a - 161);
 
-  localStorage.setItem('bmrHeight', h);
-  localStorage.setItem('bmrWeight', w);
-  localStorage.setItem('bmrAge', a);
-  localStorage.setItem('bmrSex', s);
-  saveBmr(calc);
+  await saveBmr(calc, h, w, a, s);
   closeBmrModal();
   showToast(`BMR: ${calc} kcal/day`);
 }
@@ -1747,6 +1769,7 @@ function getDefaultMeal() {
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 refreshKeyStatus();
+loadBmrForCurrentDate();
 render();
 initAuth();
 document.getElementById('mealType').value = getDefaultMeal();
