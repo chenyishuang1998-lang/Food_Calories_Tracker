@@ -545,16 +545,18 @@ function skipLogin() {
 }
 
 async function initAuth() {
+  let _synced = false;
   _supa.auth.onAuthStateChange(async (event, session) => {
     console.log('[auth] event:', event, 'session:', !!session);
     if (session) {
       setUser(session.user);
-      if (event === 'SIGNED_IN') {
-        await new Promise(r => setTimeout(r, 500));
+      if (event === 'SIGNED_IN' && !_synced) {
+        _synced = true;
         await syncFromCloud();
       }
       showApp();
     } else {
+      _synced = false;
       setUser(null);
       if (localStorage.getItem('skippedLogin')) {
         showApp();
@@ -653,10 +655,9 @@ async function syncToCloud(dateKey, data) {
 let _syncPromise = null;
 async function syncFromCloud() {
   if (!_user) { console.log('[sync] no user, skip'); return; }
-  if (_syncPromise) { console.log('[sync] waiting for existing sync'); return _syncPromise; }
-  _syncPromise = _doSync();
-  await _syncPromise;
-  _syncPromise = null;
+  if (_syncPromise) { console.log('[sync] already running, skip'); return; }
+  _syncPromise = _doSync().finally(() => { _syncPromise = null; });
+  return _syncPromise;
 }
 
 async function _doSync() {
