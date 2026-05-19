@@ -167,8 +167,8 @@
     .user-btn .user-initial { width:26px; height:26px; border-radius:50%; background:var(--blue); color:white; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600; }
     .user-dropdown { display:none; position:absolute; top:calc(100%+8px); right:0; background:#fff; border:0.5px solid var(--border); border-radius:var(--r-lg); min-width:190px; box-shadow:0 8px 32px rgba(0,0,0,.12); z-index:100; overflow:hidden; }
     .user-dropdown.open { display:block; }
-    .user-dropdown-name { padding:12px 16px 8px; font-size:13px; color:var(--muted); border-bottom:0.5px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .user-dropdown-item { display:flex; align-items:center; gap:10px; padding:12px 16px; font-size:15px; cursor:pointer; color:var(--text); }
+    .user-dropdown-name { padding:14px 16px 10px; font-size:13px; color:var(--muted); border-bottom:0.5px solid var(--border); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .user-dropdown-item { display:flex; align-items:center; gap:10px; padding:13px 16px; font-size:15px; cursor:pointer; color:var(--text); font-weight:400; }
     .user-dropdown-item:hover { background:var(--surface2); }
     #userBtnWrap { position:relative; }
     .sync-dot { width:7px; height:7px; border-radius:50%; background:var(--green); display:inline-block; margin-left:2px; }
@@ -185,7 +185,7 @@
     .cal-day.today { background:var(--blue); color:#fff; font-weight:600; }
     .cal-day.today:hover { background:var(--blue-dark); }
     .cal-day.selected:not(.today) { background:var(--surface2); font-weight:600; }
-    .cal-day.has-data::after { content:''; display:block; width:4px; height:4px; background:var(--blue); border-radius:50%; position:absolute; bottom:4px; }
+    .cal-day.has-data::after { content:''; display:block; width:4px; height:4px; background:var(--blue); border-radius:50%; position:absolute; bottom:3px; }
     .cal-day.today.has-data::after { background:rgba(255,255,255,0.8); }
     .cal-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
     .cal-nav-btn { background:none; border:none; cursor:pointer; color:var(--blue); font-size:20px; font-weight:400; font-family:inherit; padding:4px 8px; border-radius:var(--r-sm); line-height:1; }
@@ -1149,16 +1149,16 @@ function renderCalendar() {
   grid.innerHTML = '';
   DAYS.forEach(d => {
     const el = document.createElement('div');
-    el.className = 'cal-day-label'; el.textContent = d;
+    el.className = 'cal-day-name'; el.textContent = d;
     grid.appendChild(el);
   });
 
-  const today = todayKey(); // timezone-safe
+  const today = todayKey();
   const firstDow = new Date(calYear, calMonth, 1).getDay();
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
 
   for (let i = 0; i < firstDow; i++) {
-    const el = document.createElement('div'); el.className = 'cal-cell empty';
+    const el = document.createElement('div');
     grid.appendChild(el);
   }
 
@@ -1168,20 +1168,11 @@ function renderCalendar() {
     const total = data.reduce((s,f) => s + f.cal, 0);
 
     const el = document.createElement('div');
-    el.className = 'cal-cell'
+    el.className = 'cal-day'
       + (dateKey === today ? ' today' : '')
-      + (dateKey === selectedDate ? ' selected' : '');
-
-    const numEl = document.createElement('div');
-    numEl.className = 'c-num'; numEl.textContent = d;
-    el.appendChild(numEl);
-
-    if (total > 0) {
-      const dot = document.createElement('div');
-      dot.className = 'c-dot';
-      dot.style.background = total > goal ? '#dc2626' : total > goal*0.8 ? '#d97706' : '#16a34a';
-      el.appendChild(dot);
-    }
+      + (dateKey === selectedDate ? ' selected' : '')
+      + (total > 0 ? ' has-data' : '');
+    el.textContent = d;
 
     el.onclick = () => {
       if (selectedDate === dateKey) {
