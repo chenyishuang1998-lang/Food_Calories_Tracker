@@ -78,6 +78,29 @@
     .edit-actions button { flex:1; padding:12px; border:none; border-radius:10px; font-size:15px; font-weight:500; cursor:pointer; font-family:inherit; }
     .edit-save { background:var(--blue); color:white; }
     .edit-cancel { background:var(--surface2); color:var(--text); }
+
+    /* Describe modal */
+    .describe-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:200; align-items:center; justify-content:center; padding:20px; }
+    .describe-overlay.open { display:flex; }
+    .describe-card { background:var(--surface); border-radius:16px; padding:24px; width:100%; max-width:360px; }
+    .describe-card h3 { margin:0 0 12px; font-size:17px; }
+    .describe-card textarea { width:100%; background:var(--surface2); border:none; border-radius:10px; padding:12px; color:var(--text); font-size:15px; font-family:inherit; resize:none; height:90px; box-sizing:border-box; }
+    .describe-card textarea::placeholder { color:var(--muted); }
+
+    /* Result preview modal */
+    .preview-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:200; align-items:flex-end; justify-content:center; }
+    .preview-overlay.open { display:flex; }
+    .preview-card { background:var(--surface); border-radius:16px 16px 0 0; padding:24px; width:100%; max-width:480px; max-height:80vh; overflow-y:auto; }
+    .preview-card h3 { margin:0 0 16px; font-size:17px; }
+    .preview-item { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
+    .preview-item:last-child { border-bottom:none; }
+    .preview-emoji { font-size:24px; width:32px; text-align:center; }
+    .preview-fields { flex:1; display:flex; flex-direction:column; gap:6px; }
+    .preview-fields input { background:var(--surface2); border:none; border-radius:8px; padding:8px 10px; color:var(--text); font-size:14px; font-family:inherit; width:100%; box-sizing:border-box; }
+    .preview-fields input[type=number] { width:80px; }
+    .preview-row { display:flex; gap:6px; }
+    .preview-del { background:none; border:none; color:var(--muted); font-size:18px; cursor:pointer; padding:4px 8px; }
+    .preview-meal-sel { background:var(--surface2); border:none; border-radius:8px; padding:8px 10px; color:var(--text); font-size:14px; font-family:inherit; flex:1; }
     .login-page { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 20px; text-align: center; }
     .login-logo { font-size: 56px; font-weight: 700; letter-spacing: -2px; margin-bottom: 8px; }
     .login-tagline { color: var(--muted); font-size: 15px; margin-bottom: 48px; }
@@ -381,13 +404,12 @@
     <div class="add-section">
       <div class="section-label">Add food</div>
       <input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp" onchange="handlePhoto(event)" />
-      <input type="file" id="albumInput" accept="image/jpeg,image/png,image/webp" onchange="handlePhoto(event)" />
       <div class="photo-row">
         <button class="photo-btn" id="cameraBtn" onclick="openCamera()">
           <span id="cameraBtnInner">📷 Take Photo</span>
         </button>
-        <button class="photo-btn" id="albumBtn" onclick="openAlbum()">
-          <span id="albumBtnInner">🖼️ From Library</span>
+        <button class="photo-btn" id="describeBtn" onclick="openDescribe()">
+          <span id="describeBtnInner">✏️ Describe</span>
         </button>
       </div>
       <!-- Camera stream modal -->
@@ -445,6 +467,30 @@
 </div>
 
 <!-- Settings sheet -->
+<!-- Describe modal -->
+<div class="describe-overlay" id="describeOverlay" onclick="closeDescribeIfBg(event)">
+  <div class="describe-card">
+    <h3>Describe your meal</h3>
+    <textarea id="describeInput" placeholder="e.g. a bowl of ramen with egg and pork, large size"></textarea>
+    <div class="edit-actions" style="margin-top:12px">
+      <button class="edit-cancel" onclick="closeDescribe()">Cancel</button>
+      <button class="edit-save" id="describeSubmitBtn" onclick="submitDescribe()">Estimate →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Result preview modal -->
+<div class="preview-overlay" id="previewOverlay" onclick="closePreviewIfBg(event)">
+  <div class="preview-card">
+    <h3>Review before adding</h3>
+    <div id="previewItems"></div>
+    <div class="edit-actions" style="margin-top:16px">
+      <button class="edit-cancel" onclick="closePreview()">Cancel</button>
+      <button class="edit-save" onclick="confirmPreview()">Add to log</button>
+    </div>
+  </div>
+</div>
+
 <!-- Edit food modal -->
 <div class="edit-overlay" id="editOverlay" onclick="closeEditIfBg(event)">
   <div class="edit-card">
@@ -911,13 +957,109 @@ function saveEdit() {
   showToast('Updated');
 }
 
+// ── Describe modal ────────────────────────────────────────────────────────────
+function openDescribe() {
+  document.getElementById('describeInput').value = '';
+  document.getElementById('describeOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('describeInput').focus(), 100);
+}
+function closeDescribe() { document.getElementById('describeOverlay').classList.remove('open'); }
+function closeDescribeIfBg(e) { if (e.target === document.getElementById('describeOverlay')) closeDescribe(); }
+
+async function submitDescribe() {
+  const text = document.getElementById('describeInput').value.trim();
+  if (!text) { showToast('Please describe your meal'); return; }
+  const apiKey = localStorage.getItem('openrouterKey');
+  if (!apiKey) { openSettings(); showToast('Set your OpenRouter API key first'); return; }
+
+  const btn = document.getElementById('describeSubmitBtn');
+  btn.textContent = 'Estimating…';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'openrouter/free',
+        messages: [{ role: 'user', content: `Estimate calories for: "${text}". Return only raw JSON, no markdown: {"items":[{"name":"food name","cal":integer_kcal,"emoji":"single emoji"}]}. List each component separately if multiple foods.` }]
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const raw = (data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(raw);
+    if (parsed.items?.length) {
+      closeDescribe();
+      showPreview(parsed.items);
+    } else { showToast('Could not estimate — try being more specific'); }
+  } catch(e) {
+    console.error(e);
+    showToast((e.message || 'Failed to estimate').slice(0, 100));
+  } finally {
+    btn.textContent = 'Estimate →';
+    btn.disabled = false;
+  }
+}
+
+// ── Result preview modal ──────────────────────────────────────────────────────
+let _previewItems = [];
+
+function showPreview(items) {
+  const meal = document.getElementById('mealType').value;
+  _previewItems = items.map(item => ({ ...item, meal, emoji: item.emoji || getEmoji(item.name) }));
+  renderPreview();
+  document.getElementById('previewOverlay').classList.add('open');
+}
+
+function renderPreview() {
+  const container = document.getElementById('previewItems');
+  container.innerHTML = _previewItems.map((item, i) => `
+    <div class="preview-item">
+      <span class="preview-emoji">${item.emoji}</span>
+      <div class="preview-fields">
+        <input type="text" value="${item.name}" oninput="_previewItems[${i}].name=this.value" placeholder="Food name" />
+        <div class="preview-row">
+          <input type="number" value="${item.cal}" oninput="_previewItems[${i}].cal=parseInt(this.value)||0" style="width:80px" />
+          <select class="preview-meal-sel" onchange="_previewItems[${i}].meal=this.value">
+            <option value="breakfast" ${item.meal==='breakfast'?'selected':''}>🌅 Breakfast</option>
+            <option value="lunch" ${item.meal==='lunch'?'selected':''}>☀️ Lunch</option>
+            <option value="dinner" ${item.meal==='dinner'?'selected':''}>🌙 Dinner</option>
+            <option value="snack" ${item.meal==='snack'?'selected':''}>🍪 Snack</option>
+          </select>
+        </div>
+      </div>
+      <button class="preview-del" onclick="_previewItems.splice(${i},1);renderPreview()">✕</button>
+    </div>
+  `).join('');
+}
+
+function closePreview() {
+  document.getElementById('previewOverlay').classList.remove('open');
+  _previewItems = [];
+}
+function closePreviewIfBg(e) { if (e.target === document.getElementById('previewOverlay')) closePreview(); }
+
+function confirmPreview() {
+  if (!_previewItems.length) { closePreview(); return; }
+  const key = keyByOffset(offset);
+  const existing = getData(key);
+  _previewItems.forEach(item => {
+    existing.push({ id: Date.now()+Math.random(), name: item.name, cal: item.cal, meal: item.meal, emoji: item.emoji });
+    openMeals[item.meal] = true;
+  });
+  saveData(key, existing);
+  render();
+  showToast(`Added ${_previewItems.length} item${_previewItems.length>1?'s':''}`);
+  closePreview();
+}
+
 function toggleMeal(k) { openMeals[k] = !openMeals[k]; render(); }
 
 // ── Photo / AI ────────────────────────────────────────────────────────────────
 async function handlePhoto(event) {
   const file = event.target.files[0];
   if (!file) return;
-  // iOS Safari cannot send File objects via fetch - use Take Photo instead
   if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
     showToast('Please use Take Photo instead — iOS Safari limitation');
     event.target.value = '';
@@ -927,13 +1069,11 @@ async function handlePhoto(event) {
   const apiKey = localStorage.getItem('openrouterKey');
   if (!apiKey) { openSettings(); showToast('Set your OpenRouter API key first'); return; }
 
-  // Show loading
-  document.getElementById('albumBtnInner').innerHTML = '<span class="spinner"></span> Identifying…';
-  document.getElementById('albumBtn').disabled = true;
+  document.getElementById('cameraBtnInner').innerHTML = '<span class="spinner"></span> Identifying…';
   document.getElementById('cameraBtn').disabled = true;
+  document.getElementById('describeBtn').disabled = true;
 
   try {
-    // Send file directly as multipart - bypasses all iOS Safari base64 restrictions
     const formData = new FormData();
     formData.append('image', file);
     formData.append('apiKey', apiKey);
@@ -942,25 +1082,15 @@ async function handlePhoto(event) {
     if (!res.ok) throw new Error(parsed.error || 'Server error');
 
     if (parsed.items?.length) {
-      const meal = document.getElementById('mealType').value;
-      const key = keyByOffset(offset);
-      const existing = getData(key);
-      parsed.items.forEach(item => {
-        existing.push({ id: Date.now()+Math.random(), name:item.name, cal:item.cal, meal, emoji:item.emoji||getEmoji(item.name) });
-      });
-      saveData(key, existing);
-      openMeals[meal] = true;
-      render();
-      showToast(`Found ${parsed.items.length} item${parsed.items.length>1?'s':''}`);
+      showPreview(parsed.items);
     } else { showToast('No food detected — try again'); }
   } catch(e) {
     console.error('Photo error:', e);
-    const msg = e?.message || e?.toString() || 'Unknown error';
-    showToast(msg.slice(0, 100));
+    showToast((e?.message || 'Unknown error').slice(0, 100));
   } finally {
-    document.getElementById('albumBtnInner').innerHTML = '🖼️ From Library';
+    document.getElementById('cameraBtnInner').innerHTML = '📷 Take Photo';
     document.getElementById('cameraBtn').disabled = false;
-    document.getElementById('albumBtn').disabled = false;
+    document.getElementById('describeBtn').disabled = false;
     event.target.value = '';
   }
 }
@@ -1173,9 +1303,6 @@ function renderDayDetail(dateKey) {
 // ── Camera stream ────────────────────────────────────────────────────────────
 let cameraStream = null;
 
-function openAlbum() {
-  document.getElementById('albumInput').click();
-}
 
 async function openCamera() {
   const modal = document.getElementById('cameraModal');
@@ -1237,7 +1364,7 @@ async function snapPhoto() {
 
   document.getElementById('cameraBtnInner').innerHTML = '<span class="spinner"></span> Identifying…';
   document.getElementById('cameraBtn').disabled = true;
-  document.getElementById('albumBtn').disabled = true;
+  document.getElementById('describeBtn').disabled = true;
 
   try {
     const res = await fetch('/api/recognize', {
@@ -1248,16 +1375,8 @@ async function snapPhoto() {
     const parsed = await res.json();
     if (!res.ok) throw new Error(parsed.error || 'Server error');
     if (parsed.items?.length) {
-      const meal = document.getElementById('mealType').value;
-      const key = keyByOffset(offset);
-      const existing = getData(key);
-      parsed.items.forEach(item => {
-        existing.push({ id: Date.now()+Math.random(), name:item.name, cal:item.cal, meal, emoji:item.emoji||getEmoji(item.name) });
-      });
-      saveData(key, existing);
-      openMeals[meal] = true;
-      render();
-      showToast(`Found ${parsed.items.length} item${parsed.items.length>1?'s':''}`);
+      closeCamera();
+      showPreview(parsed.items);
     } else { showToast('No food detected — try again'); }
   } catch(e) {
     console.error(e);
@@ -1265,7 +1384,7 @@ async function snapPhoto() {
   } finally {
     document.getElementById('cameraBtnInner').innerHTML = '📷 Take Photo';
     document.getElementById('cameraBtn').disabled = false;
-    document.getElementById('albumBtn').disabled = false;
+    document.getElementById('describeBtn').disabled = false;
   }
 }
 
