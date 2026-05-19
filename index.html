@@ -982,7 +982,7 @@ async function submitDescribe() {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: 'openrouter/free',
-        messages: [{ role: 'user', content: `Estimate calories for: "${text}". Return only raw JSON, no markdown: {"items":[{"name":"food name","cal":integer_kcal,"emoji":"single emoji"}]}. List each component separately if multiple foods.` }]
+        messages: [{ role: 'user', content: `Estimate calories for: "${text}". Group by dish. Return only raw JSON, no markdown: {"items":[{"name":"dish name","cal":total_integer_kcal,"emoji":"single emoji","components":[{"name":"component name","cal":integer_kcal,"emoji":"single emoji"}]}]}. If only one food with no sub-components, leave components as empty array.` }]
       })
     });
     const data = await res.json();
@@ -1015,23 +1015,45 @@ function showPreview(items) {
 function renderPreview() {
   const container = document.getElementById('previewItems');
   container.innerHTML = _previewItems.map((item, i) => `
-    <div class="preview-item">
-      <span class="preview-emoji">${item.emoji}</span>
-      <div class="preview-fields">
-        <input type="text" value="${item.name}" oninput="_previewItems[${i}].name=this.value" placeholder="Food name" />
-        <div class="preview-row">
-          <input type="number" value="${item.cal}" oninput="_previewItems[${i}].cal=parseInt(this.value)||0" style="width:80px" />
-          <select class="preview-meal-sel" onchange="_previewItems[${i}].meal=this.value">
-            <option value="breakfast" ${item.meal==='breakfast'?'selected':''}>🌅 Breakfast</option>
-            <option value="lunch" ${item.meal==='lunch'?'selected':''}>☀️ Lunch</option>
-            <option value="dinner" ${item.meal==='dinner'?'selected':''}>🌙 Dinner</option>
-            <option value="snack" ${item.meal==='snack'?'selected':''}>🍪 Snack</option>
-          </select>
+    <div class="preview-item" style="flex-direction:column;align-items:stretch;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="preview-emoji">${item.emoji}</span>
+        <div class="preview-fields" style="flex:1">
+          <input type="text" value="${item.name}" oninput="_previewItems[${i}].name=this.value" placeholder="Dish name" />
+          <div class="preview-row">
+            <input type="number" value="${item.cal}" oninput="_previewItems[${i}].cal=parseInt(this.value)||0" style="width:80px" />
+            <select class="preview-meal-sel" onchange="_previewItems[${i}].meal=this.value">
+              <option value="breakfast" ${item.meal==='breakfast'?'selected':''}>🌅 Breakfast</option>
+              <option value="lunch" ${item.meal==='lunch'?'selected':''}>☀️ Lunch</option>
+              <option value="dinner" ${item.meal==='dinner'?'selected':''}>🌙 Dinner</option>
+              <option value="snack" ${item.meal==='snack'?'selected':''}>🍪 Snack</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+          ${item.components?.length ? `<button onclick="toggleComponents(${i})" style="background:var(--surface2);border:none;border-radius:6px;padding:4px 8px;color:var(--muted);font-size:12px;cursor:pointer" id="compBtn${i}">${item._expanded ? '▲' : '▼'} ${item.components.length}</button>` : ''}
+          <button class="preview-del" onclick="_previewItems.splice(${i},1);renderPreview()">✕</button>
         </div>
       </div>
-      <button class="preview-del" onclick="_previewItems.splice(${i},1);renderPreview()">✕</button>
+      ${item.components?.length && item._expanded ? `
+        <div style="margin-left:42px;border-left:2px solid var(--border);padding-left:12px;display:flex;flex-direction:column;gap:6px">
+          ${item.components.map((c, j) => `
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px">${c.emoji}</span>
+              <input type="text" value="${c.name}" oninput="_previewItems[${i}].components[${j}].name=this.value" style="flex:1;background:var(--surface2);border:none;border-radius:6px;padding:6px 8px;color:var(--text);font-size:13px;font-family:inherit" />
+              <input type="number" value="${c.cal}" oninput="_previewItems[${i}].components[${j}].cal=parseInt(this.value)||0" style="width:64px;background:var(--surface2);border:none;border-radius:6px;padding:6px 8px;color:var(--text);font-size:13px;font-family:inherit" />
+              <span style="font-size:12px;color:var(--muted)">kcal</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
     </div>
   `).join('');
+}
+
+function toggleComponents(i) {
+  _previewItems[i]._expanded = !_previewItems[i]._expanded;
+  renderPreview();
 }
 
 function closePreview() {
