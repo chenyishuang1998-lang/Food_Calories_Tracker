@@ -544,38 +544,26 @@ function skipLogin() {
 }
 
 async function initAuth() {
-  let _synced = false;
-
-  async function doSync() {
-    if (_synced) return;
-    _synced = true;
-    await syncFromCloud();
-  }
-
-  // Hash branch: Google OAuth redirect
+  // Parse access_token from URL hash manually if present
   const hash = window.location.hash;
   if (hash && hash.includes('access_token')) {
     const params = new URLSearchParams(hash.slice(1));
     const accessToken = params.get('access_token');
     const refreshToken = params.get('refresh_token');
-    history.replaceState(null, '', window.location.pathname);
     if (accessToken) {
       try {
-        const { data } = await _supa.auth.setSession({
+        const { data, error } = await _supa.auth.setSession({
           access_token: accessToken,
           refresh_token: refreshToken || ''
         });
         if (data?.user) {
           setUser(data.user);
-          await doSync();
+          syncFromCloud();
           showApp();
         }
       } catch(e) { console.error('setSession error:', e); }
     }
-    // Register listener for future events (sign out etc)
-    _supa.auth.onAuthStateChange((event, session) => {
-      if (!session) { setUser(null); showLoginPage(); }
-    });
+    history.replaceState(null, '', window.location.pathname);
     return;
   }
 
@@ -590,16 +578,12 @@ async function initAuth() {
     showLoginPage();
   }
 
-  _supa.auth.onAuthStateChange(async (event, session) => {
+  _supa.auth.onAuthStateChange((event, session) => {
     if (session) {
       setUser(session.user);
-      if (event === 'SIGNED_IN') {
-        await doSync();
-        showApp();
-      }
+      if (event === 'SIGNED_IN') { syncFromCloud(); showApp(); }
     } else {
       setUser(null);
-      showLoginPage();
     }
   });
 }
@@ -697,10 +681,9 @@ async function syncFromCloud() {
       .eq('user_id', _user.id)
       .order('created_at', { ascending: true });
 
-    // Clear all food data from localStorage
-    const keepKeys = ['openrouterKey', 'skippedLogin', 'aiProvider', 'calGoal'];
+    // Clear existing local food data before writing cloud data
     Object.keys(localStorage).forEach(k => {
-      if (!keepKeys.includes(k)) localStorage.removeItem(k);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k)) localStorage.removeItem(k);
     });
 
     if (!rows?.length) { render(); return; }
