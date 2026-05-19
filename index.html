@@ -470,7 +470,11 @@
     <h3 id="describeTitle">Describe your meal</h3>
     <p id="describeHint" style="font-size:13px;color:var(--muted);margin:0 0 10px"></p>
     <textarea id="describeInput" placeholder="e.g. large portion, with extra cheese, no sauce..."></textarea>
-    <div class="edit-actions" style="margin-top:12px">
+    <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+      <input type="number" id="describeManualCal" placeholder="kcal (optional)" min="0" style="flex:1;font-size:14px;padding:10px 12px" />
+      <button onclick="addDescribeDirectly()" style="background:var(--surface2);border:none;border-radius:var(--r-sm);padding:10px 16px;font-size:14px;font-weight:500;color:var(--text);cursor:pointer;font-family:inherit;white-space:nowrap">Add</button>
+    </div>
+    <div class="edit-actions" style="margin-top:10px">
       <button class="edit-cancel" id="describeSkipBtn" style="display:none" onclick="skipDescribe()">Skip</button>
       <button class="edit-cancel" id="describeCancelBtn" onclick="closeDescribe()">Cancel</button>
       <button class="edit-save" id="describeSubmitBtn" onclick="submitDescribe()">Estimate →</button>
@@ -986,9 +990,25 @@ function openDescribe() {
   document.getElementById('describeSkipBtn').style.display = 'none';
   document.getElementById('describeCancelBtn').style.display = '';
   document.getElementById('describeInput').value = '';
+  document.getElementById('describeManualCal').value = '';
   document.getElementById('describeInput').placeholder = 'e.g. a bowl of ramen with egg and pork, large size';
   document.getElementById('describeOverlay').classList.add('open');
   setTimeout(() => document.getElementById('describeInput').focus(), 100);
+}
+
+function addDescribeDirectly() {
+  const name = document.getElementById('describeInput').value.trim();
+  if (!name) { showToast('Please describe your meal'); return; }
+  const cal = parseInt(document.getElementById('describeManualCal').value) || 0;
+  const meal = document.getElementById('mealType').value;
+  const key = keyByOffset(offset);
+  const existing = getData(key);
+  existing.push({ id: Date.now() + Math.random(), name, cal, meal, emoji: getEmoji(name) });
+  saveData(key, existing);
+  openMeals[meal] = true;
+  render();
+  closeDescribe();
+  showToast('Added');
 }
 
 function openDescribeAfterPhoto(base64, mediaType) {
@@ -998,6 +1018,7 @@ function openDescribeAfterPhoto(base64, mediaType) {
   document.getElementById('describeSkipBtn').style.display = '';
   document.getElementById('describeCancelBtn').style.display = 'none';
   document.getElementById('describeInput').value = '';
+  document.getElementById('describeManualCal').value = '';
   document.getElementById('describeInput').placeholder = 'e.g. large portion, extra cheese, grilled not fried...';
   document.getElementById('describeOverlay').classList.add('open');
   setTimeout(() => document.getElementById('describeInput').focus(), 100);
