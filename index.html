@@ -549,7 +549,8 @@ async function initAuth() {
     console.log('[auth] event:', event, 'session:', !!session);
     if (session) {
       setUser(session.user);
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+      if (event === 'SIGNED_IN') {
+        await new Promise(r => setTimeout(r, 500));
         await syncFromCloud();
       }
       showApp();
