@@ -550,8 +550,8 @@ async function initAuth() {
     if (session) {
       setUser(session.user);
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
-        await syncFromCloud();
         showApp();
+        syncFromCloud();
       }
     } else {
       setUser(null);
@@ -656,21 +656,21 @@ async function syncFromCloud() {
   _syncing = true;
   console.log('[sync] starting for user', _user.id);
   try {
-    const { data: rows, error } = await _supa.from('food_logs')
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
+    const query = _supa.from('food_logs')
       .select('*')
       .eq('user_id', _user.id)
       .order('created_at', { ascending: true });
 
+    const { data: rows, error } = await Promise.race([query, timeout]);
     console.log('[sync] rows from cloud:', rows, 'error:', error);
 
-    // Clear existing local food data before writing cloud data
     Object.keys(localStorage).forEach(k => {
       if (/^\d{4}-\d{2}-\d{2}$/.test(k)) localStorage.removeItem(k);
     });
 
     if (!rows?.length) { console.log('[sync] no rows, rendering empty'); render(); return; }
 
-    // Group by date and save to localStorage
     const byDate = {};
     rows.forEach(r => {
       if (!byDate[r.date]) byDate[r.date] = [];
@@ -682,8 +682,11 @@ async function syncFromCloud() {
     console.log('[sync] written to localStorage:', Object.keys(byDate));
     render();
     showToast('Data synced from cloud');
-  } catch(e) { console.error('Sync from cloud error:', e); }
-  finally { _syncing = false; }
+  } catch(e) {
+    console.error('[sync] error:', e.message);
+    if (e.message === 'timeout') showToast('Sync timed out — showing local data');
+    render();
+  } finally { _syncing = false; }
 }
 
 // ── Date helpers (timezone-safe) ──────────────────────────────────────────────
