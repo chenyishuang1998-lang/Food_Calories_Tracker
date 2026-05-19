@@ -388,34 +388,64 @@
 
 <!-- Exercise modal -->
 <div class="describe-overlay" id="exerciseOverlay" onclick="if(event.target===this)closeExerciseModal()">
-  <div class="describe-card" style="max-width:380px">
+  <div class="describe-card" style="max-width:400px">
     <h3>Exercise</h3>
-    <div id="exerciseList" style="margin-bottom:12px"></div>
-    <select id="exercisePreset" onchange="fillExercisePreset(this.value)" style="width:100%;margin-bottom:8px">
-      <option value="">Common exercises…</option>
-      <option value="Walking 30min|120">🚶 Walking 30min — 120 kcal</option>
-      <option value="Walking 1hr|240">🚶 Walking 1hr — 240 kcal</option>
-      <option value="Running 30min|300">🏃 Running 30min — 300 kcal</option>
-      <option value="Running 1hr|600">🏃 Running 1hr — 600 kcal</option>
-      <option value="Cycling 30min|250">🚴 Cycling 30min — 250 kcal</option>
-      <option value="Cycling 1hr|500">🚴 Cycling 1hr — 500 kcal</option>
-      <option value="Swimming 30min|280">🏊 Swimming 30min — 280 kcal</option>
-      <option value="HIIT 30min|350">🔥 HIIT 30min — 350 kcal</option>
-      <option value="Weight Training 1hr|300">💪 Weight Training 1hr — 300 kcal</option>
-      <option value="Yoga 1hr|200">🧘 Yoga 1hr — 200 kcal</option>
-      <option value="Jump Rope 20min|220">🪂 Jump Rope 20min — 220 kcal</option>
-      <option value="Stair Climbing 30min|260">🪜 Stair Climbing 30min — 260 kcal</option>
-      <option value="Basketball 1hr|480">🏀 Basketball 1hr — 480 kcal</option>
-      <option value="Soccer 1hr|520">⚽ Soccer 1hr — 520 kcal</option>
-    </select>
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <input type="text" id="exerciseName" placeholder="Custom exercise name" style="flex:1" />
-      <input type="number" id="exerciseCal" placeholder="kcal" style="width:72px" />
+
+    <!-- Logged exercises -->
+    <div id="exerciseList" style="margin-bottom:16px"></div>
+
+    <!-- Add new exercise - single card -->
+    <div style="background:var(--surface2);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">Add Exercise</div>
+
+      <select id="exercisePreset" onchange="fillExercisePreset(this.value)">
+        <option value="">Select exercise…</option>
+        <optgroup label="Walking">
+          <option value="Walking|30|120">🚶 Walking — 30 min</option>
+          <option value="Walking|60|240">🚶 Walking — 60 min</option>
+        </optgroup>
+        <optgroup label="Running">
+          <option value="Running|30|300">🏃 Running — 30 min</option>
+          <option value="Running|60|600">🏃 Running — 60 min</option>
+        </optgroup>
+        <optgroup label="Cycling">
+          <option value="Cycling|30|250">🚴 Cycling — 30 min</option>
+          <option value="Cycling|60|500">🚴 Cycling — 60 min</option>
+        </optgroup>
+        <optgroup label="Strength & HIIT">
+          <option value="HIIT|30|350">🔥 HIIT — 30 min</option>
+          <option value="Weight Training|60|300">💪 Weight Training — 60 min</option>
+          <option value="Jump Rope|20|220">🪂 Jump Rope — 20 min</option>
+        </optgroup>
+        <optgroup label="Other">
+          <option value="Swimming|30|280">🏊 Swimming — 30 min</option>
+          <option value="Yoga|60|200">🧘 Yoga — 60 min</option>
+          <option value="Stair Climbing|30|260">🪜 Stair Climbing — 30 min</option>
+          <option value="Basketball|60|480">🏀 Basketball — 60 min</option>
+          <option value="Soccer|60|520">⚽ Soccer — 60 min</option>
+        </optgroup>
+        <option value="custom">✏️ Custom…</option>
+      </select>
+
+      <div id="exerciseCustomRow" style="display:none">
+        <input type="text" id="exerciseName" placeholder="Exercise name" />
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:500">Duration (min)</div>
+          <input type="number" id="exerciseDuration" placeholder="30" min="1" oninput="recalcExerciseCal()" />
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:500">Calories (kcal)</div>
+          <input type="number" id="exerciseCal" placeholder="—" min="0" />
+        </div>
+      </div>
+
+      <button class="btn btn-primary" onclick="addExercise()" style="margin-top:2px">Add</button>
     </div>
-    <div class="edit-actions">
-      <button class="edit-cancel" onclick="closeExerciseModal()">Done</button>
-      <button class="edit-save" onclick="addExercise()">Add</button>
-    </div>
+
+    <button class="edit-cancel" onclick="closeExerciseModal()" style="width:100%;margin-top:10px;padding:12px;border:none;border-radius:var(--r-sm);font-size:15px;cursor:pointer;font-family:inherit;background:none;color:var(--muted)">Done</button>
   </div>
 </div>
 
@@ -1585,24 +1615,57 @@ function renderExerciseList() {
   `).join('');
 }
 
+let _exerciseCalPer30 = 0; // base cal per 30min for recalc
+
 function fillExercisePreset(val) {
+  const customRow = document.getElementById('exerciseCustomRow');
+  if (val === 'custom') {
+    customRow.style.display = 'block';
+    document.getElementById('exerciseName').value = '';
+    document.getElementById('exerciseDuration').value = '';
+    document.getElementById('exerciseCal').value = '';
+    _exerciseCalPer30 = 0;
+    return;
+  }
+  customRow.style.display = 'none';
   if (!val) return;
-  const [name, cal] = val.split('|');
-  document.getElementById('exerciseName').value = name;
+  const [name, mins, cal] = val.split('|');
+  document.getElementById('exerciseDuration').value = mins;
   document.getElementById('exerciseCal').value = cal;
-  document.getElementById('exercisePreset').value = '';
+  _exerciseCalPer30 = Math.round(parseInt(cal) / parseInt(mins) * 30);
+}
+
+function recalcExerciseCal() {
+  if (_exerciseCalPer30 <= 0) return;
+  const mins = parseInt(document.getElementById('exerciseDuration').value) || 0;
+  if (mins > 0) {
+    document.getElementById('exerciseCal').value = Math.round(_exerciseCalPer30 * mins / 30);
+  }
 }
 
 function addExercise() {
-  const name = document.getElementById('exerciseName').value.trim();
+  const preset = document.getElementById('exercisePreset').value;
+  let name;
+  if (preset === 'custom' || preset === '') {
+    name = document.getElementById('exerciseName').value.trim();
+    if (!name) { showToast('Enter exercise name'); return; }
+  } else {
+    name = preset.split('|')[0];
+  }
+  const duration = parseInt(document.getElementById('exerciseDuration').value) || 0;
   const cal = parseInt(document.getElementById('exerciseCal').value);
-  if (!name || !cal) { showToast('Enter exercise name and calories'); return; }
+  if (!cal) { showToast('Enter calories burned'); return; }
+  const display = duration > 0 ? `${name} ${duration}min` : name;
   const key = 'exercises_' + keyByOffset(offset);
   const ex = JSON.parse(localStorage.getItem(key) || '[]');
-  ex.push({ name, cal });
+  ex.push({ name: display, cal });
   localStorage.setItem(key, JSON.stringify(ex));
+  document.getElementById('exercisePreset').value = '';
   document.getElementById('exerciseName').value = '';
+  document.getElementById('exerciseDuration').value = '';
   document.getElementById('exerciseCal').value = '';
+  document.getElementById('exerciseCustomRow').style.display = 'none';
+  _exerciseCalPer30 = 0;
   renderExerciseList();
   showToast('Exercise added');
 }
