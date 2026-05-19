@@ -536,7 +536,6 @@ function showLoginPage() {
 function showApp() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
-  render();
 }
 
 function skipLogin() {
@@ -545,42 +544,48 @@ function skipLogin() {
 }
 
 async function initAuth() {
-  let _synced = false;
-
-  _supa.auth.onAuthStateChange(async (event, session) => {
-    console.log('[auth] event:', event, 'session:', !!session);
-    if (event === 'INITIAL_SESSION') return;
-    if (session) {
-      setUser(session.user);
-      if (event === 'SIGNED_IN' && !_synced) {
-        _synced = true;
-        await syncFromCloud();
-        showApp();
-      }
-    } else {
-      _synced = false;
-      setUser(null);
-      if (localStorage.getItem('skippedLogin')) {
-        showApp();
-      } else {
-        showLoginPage();
-      }
+  // Parse access_token from URL hash manually if present
+  const hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    const params = new URLSearchParams(hash.slice(1));
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    if (accessToken) {
+      try {
+        const { data, error } = await _supa.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || ''
+        });
+        if (data?.user) {
+          setUser(data.user);
+          syncFromCloud();
+          showApp();
+        }
+      } catch(e) { console.error('setSession error:', e); }
     }
-  });
+    history.replaceState(null, '', window.location.pathname);
+    return;
+  }
 
+  // No hash — check existing session
   const { data: { session } } = await _supa.auth.getSession();
   if (session) {
     setUser(session.user);
-    if (!_synced) {
-      _synced = true;
-      await syncFromCloud();
-    }
     showApp();
   } else if (localStorage.getItem('skippedLogin')) {
     showApp();
   } else {
     showLoginPage();
   }
+
+  _supa.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      setUser(session.user);
+      if (event === 'SIGNED_IN') { syncFromCloud(); showApp(); }
+    } else {
+      setUser(null);
+    }
+  });
 }
 
 function setUser(user) {
@@ -668,51 +673,33 @@ async function syncToCloud(dateKey, data) {
   return _pendingSync;
 }
 
-let _syncPromise = null;
 async function syncFromCloud() {
-  if (!_user) { console.log('[sync] no user, skip'); return; }
-  if (_syncPromise) { console.log('[sync] already running, skip'); return; }
-  _syncPromise = _doSync().finally(() => { _syncPromise = null; });
-  return _syncPromise;
-}
-
-async function _doSync() {
-  console.log('[sync] starting for user', _user.id);
-  showToast('Syncing...');
+  if (!_user) return;
   try {
-    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 8000));
-    const query = _supa.from('food_logs')
+    const { data: rows } = await _supa.from('food_logs')
       .select('*')
       .eq('user_id', _user.id)
       .order('created_at', { ascending: true });
 
-    const { data: rows, error } = await Promise.race([query, timeout]);
-    console.log('[sync] rows from cloud:', rows?.length, 'error:', error);
-
-    // Clear everything except non-food keys
-    const keepKeys = ['openrouterKey', 'skippedLogin', 'aiProvider'];
+    // Clear existing local food data before writing cloud data
     Object.keys(localStorage).forEach(k => {
-      if (!keepKeys.includes(k)) localStorage.removeItem(k);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(k)) localStorage.removeItem(k);
     });
 
-    if (!rows?.length) { showToast('No cloud data found'); render(); return; }
+    if (!rows?.length) { render(); return; }
 
+    // Group by date and save to localStorage
     const byDate = {};
     rows.forEach(r => {
       if (!byDate[r.date]) byDate[r.date] = [];
-      byDate[r.date].push({ id: r.id, name: r.name, cal: r.cal, meal: r.meal, emoji: r.emoji });
+      byDate[r.date].push({ id: Date.now() + Math.random(), name: r.name, cal: r.cal, meal: r.meal, emoji: r.emoji });
     });
     Object.entries(byDate).forEach(([date, items]) => {
       localStorage.setItem(date, JSON.stringify(items));
     });
-    console.log('[sync] done, dates:', Object.keys(byDate));
     render();
-    showToast(`Synced ${rows.length} items`);
-  } catch(e) {
-    console.error('[sync] error:', e.message);
-    showToast('Sync failed: ' + e.message);
-    render();
-  }
+    showToast('Data synced from cloud');
+  } catch(e) { console.error('Sync from cloud error:', e); }
 }
 
 // ── Date helpers (timezone-safe) ──────────────────────────────────────────────
@@ -859,8 +846,8 @@ function render() {
               <span class="food-emoji">${f.emoji||'🍽️'}</span>
               <span class="food-name-text">${f.name}</span>
               <span class="food-kcal">${f.cal}</span>
-              <button class="food-del" style="margin-right:2px;background:var(--surface2);color:var(--text)" onclick="openEdit('${f.id}')">✎</button>
-              <button class="food-del" onclick="deleteFood('${f.id}')">✕</button>
+              <button class="food-del" style="margin-right:2px;background:var(--surface2);color:var(--text)" onclick="openEdit(${f.id})">✎</button>
+              <button class="food-del" onclick="deleteFood(${f.id})">✕</button>
             </div>`).join('')}
       </div>` : ''}
     `;
@@ -887,14 +874,14 @@ function addFood() {
 
 function deleteFood(id) {
   const key = keyByOffset(offset);
-  saveData(key, getData(key).filter(f => String(f.id) !== String(id)));
+  saveData(key, getData(key).filter(f => f.id !== id));
   render();
 }
 
 let _editId = null;
 function openEdit(id) {
   const key = keyByOffset(offset);
-  const item = getData(key).find(f => String(f.id) === String(id));
+  const item = getData(key).find(f => f.id === id);
   if (!item) return;
   _editId = id;
   document.getElementById('editName').value = item.name;
@@ -917,7 +904,7 @@ function saveEdit() {
   const meal = document.getElementById('editMeal').value;
   if (!name || isNaN(cal)) { showToast('Please fill in all fields'); return; }
   const key = keyByOffset(offset);
-  const data = getData(key).map(f => String(f.id) === String(_editId) ? { ...f, name, cal, meal, emoji: f.emoji || getEmoji(name) } : f);
+  const data = getData(key).map(f => f.id === _editId ? { ...f, name, cal, meal, emoji: f.emoji || getEmoji(name) } : f);
   saveData(key, data);
   closeEdit();
   render();
