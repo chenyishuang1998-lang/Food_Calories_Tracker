@@ -56,7 +56,7 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    let apiKey, base64, mediaType;
+    let apiKey, base64, mediaType, description;
     const contentType = req.headers['content-type'] || '';
 
     if (contentType.includes('multipart/form-data')) {
