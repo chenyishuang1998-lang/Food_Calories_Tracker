@@ -744,6 +744,10 @@ async function syncFromCloud() {
     });
     render();
     showToast('Data synced from cloud');
+    // Also sync profile (BMR) and today's exercises
+    await syncProfileFromCloud();
+    await syncExercisesFromCloud(todayKey());
+    updateDeficit();
   } catch(e) { console.error('Sync from cloud error:', e); }
 }
 
@@ -1516,11 +1520,65 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').cat
 // ── BMR + Exercise + Deficit ──────────────────────────────────────────────────
 let bmr = parseInt(localStorage.getItem('bmr') || '0');
 let exercises = JSON.parse(localStorage.getItem('exercises_' + todayKey()) || '[]');
-
-function saveBmr(val) {
+async function saveBmr(val) {
   bmr = val;
   localStorage.setItem('bmr', val);
   updateDeficit();
+  // Sync BMR to cloud
+  if (_user) {
+    try {
+      await _supa.from('user_profiles').upsert({
+        user_id: _user.id,
+        bmr: val,
+        height: parseFloat(localStorage.getItem('bmrHeight')) || null,
+        weight: parseFloat(localStorage.getItem('bmrWeight')) || null,
+        age: parseInt(localStorage.getItem('bmrAge')) || null,
+        sex: localStorage.getItem('bmrSex') || null,
+        updated_at: new Date().toISOString()
+      });
+    } catch(e) { console.error('BMR sync error:', e); }
+  }
+}
+
+async function syncExerciseToCloud(dateKey) {
+  if (!_user) return;
+  const key = 'exercises_' + dateKey;
+  const ex = JSON.parse(localStorage.getItem(key) || '[]');
+  try {
+    await _supa.from('exercise_logs').delete().eq('user_id', _user.id).eq('date', dateKey);
+    if (ex.length > 0) {
+      await _supa.from('exercise_logs').insert(
+        ex.map(e => ({ user_id: _user.id, date: dateKey, name: e.name, cal: e.cal }))
+      );
+    }
+  } catch(e) { console.error('Exercise sync error:', e); }
+}
+
+async function syncProfileFromCloud() {
+  if (!_user) return;
+  try {
+    const { data } = await _supa.from('user_profiles').select('*').eq('user_id', _user.id).single();
+    if (data) {
+      bmr = data.bmr || 0;
+      localStorage.setItem('bmr', bmr);
+      if (data.height) localStorage.setItem('bmrHeight', data.height);
+      if (data.weight) localStorage.setItem('bmrWeight', data.weight);
+      if (data.age) localStorage.setItem('bmrAge', data.age);
+      if (data.sex) localStorage.setItem('bmrSex', data.sex);
+    }
+  } catch(e) { console.error('Profile sync error:', e); }
+}
+
+async function syncExercisesFromCloud(dateKey) {
+  if (!_user) return;
+  try {
+    const { data } = await _supa.from('exercise_logs').select('*')
+      .eq('user_id', _user.id).eq('date', dateKey);
+    if (data?.length) {
+      const key = 'exercises_' + dateKey;
+      localStorage.setItem(key, JSON.stringify(data.map(e => ({ name: e.name, cal: e.cal }))));
+    }
+  } catch(e) { console.error('Exercise fetch error:', e); }
 }
 
 function getExerciseTotal() {
@@ -1664,6 +1722,7 @@ function addExercise() {
   document.getElementById('exerciseCustomRow').style.display = 'none';
   _exerciseCalPer30 = 0;
   renderExerciseList();
+  syncExerciseToCloud(keyByOffset(offset));
   showToast('Exercise added');
 }
 
@@ -1673,6 +1732,7 @@ function removeExercise(i) {
   ex.splice(i, 1);
   localStorage.setItem(key, JSON.stringify(ex));
   renderExerciseList();
+  syncExerciseToCloud(keyByOffset(offset));
 }
 function getDefaultMeal() {
   const h = new Date().getHours();
