@@ -546,6 +546,7 @@ function skipLogin() {
 
 async function initAuth() {
   let _synced = false;
+
   _supa.auth.onAuthStateChange(async (event, session) => {
     console.log('[auth] event:', event, 'session:', !!session);
     if (event === 'INITIAL_SESSION') return;
@@ -566,9 +567,14 @@ async function initAuth() {
       }
     }
   });
+
   const { data: { session } } = await _supa.auth.getSession();
   if (session) {
     setUser(session.user);
+    if (!_synced) {
+      _synced = true;
+      await syncFromCloud();
+    }
     showApp();
   } else if (localStorage.getItem('skippedLogin')) {
     showApp();
