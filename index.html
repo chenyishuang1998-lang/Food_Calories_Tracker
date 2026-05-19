@@ -192,9 +192,10 @@
     .cal-nav-btn { background:none; border:none; cursor:pointer; color:var(--blue); font-size:20px; font-weight:400; font-family:inherit; padding:4px 8px; border-radius:var(--r-sm); line-height:1; }
     .cal-nav-btn:hover { background:var(--surface2); }
     .cal-month { font-size:17px; font-weight:600; letter-spacing:-0.3px; }
-    .chart-area { display:flex; align-items:flex-end; gap:4px; height:64px; }
-    .bar-col { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; cursor:pointer; }
-    .bar-fill { width:100%; border-radius:4px; transition:height 0.3s ease; min-height:2px; }
+    .chart-area { display:flex; align-items:flex-end; gap:3px; height:80px; }
+    .bar-col { display:flex; flex-direction:column; align-items:center; gap:3px; flex:1; cursor:pointer; }
+    .bar-fill { width:100%; border-radius:4px; transition:height 0.3s ease; min-height:2px; position:relative; }
+    .bar-val { font-size:9px; color:var(--muted); line-height:1; text-align:center; }
     .bar-x { font-size:10px; color:var(--muted); }
   </style>
 </head>
@@ -339,8 +340,12 @@
       <div class="cal-grid" id="calGrid"></div>
     </div>
     <div style="background:#fff;border-radius:var(--r-lg);padding:16px;margin-bottom:12px" id="trendSection">
-      <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">14-day trend</div>
+      <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">14-day intake</div>
       <div class="chart-area" id="trendChart"></div>
+    </div>
+    <div style="background:#fff;border-radius:var(--r-lg);padding:16px;margin-bottom:12px" id="deficitTrendSection">
+      <div style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px">14-day deficit</div>
+      <div class="chart-area" id="deficitTrendChart"></div>
     </div>
     <div id="dayDetail" style="display:none"></div>
   </div>
@@ -386,9 +391,26 @@
   <div class="describe-card" style="max-width:380px">
     <h3>Exercise</h3>
     <div id="exerciseList" style="margin-bottom:12px"></div>
+    <select id="exercisePreset" onchange="fillExercisePreset(this.value)" style="width:100%;margin-bottom:8px">
+      <option value="">Common exercises…</option>
+      <option value="Walking 30min|120">🚶 Walking 30min — 120 kcal</option>
+      <option value="Walking 1hr|240">🚶 Walking 1hr — 240 kcal</option>
+      <option value="Running 30min|300">🏃 Running 30min — 300 kcal</option>
+      <option value="Running 1hr|600">🏃 Running 1hr — 600 kcal</option>
+      <option value="Cycling 30min|250">🚴 Cycling 30min — 250 kcal</option>
+      <option value="Cycling 1hr|500">🚴 Cycling 1hr — 500 kcal</option>
+      <option value="Swimming 30min|280">🏊 Swimming 30min — 280 kcal</option>
+      <option value="HIIT 30min|350">🔥 HIIT 30min — 350 kcal</option>
+      <option value="Weight Training 1hr|300">💪 Weight Training 1hr — 300 kcal</option>
+      <option value="Yoga 1hr|200">🧘 Yoga 1hr — 200 kcal</option>
+      <option value="Jump Rope 20min|220">🪂 Jump Rope 20min — 220 kcal</option>
+      <option value="Stair Climbing 30min|260">🪜 Stair Climbing 30min — 260 kcal</option>
+      <option value="Basketball 1hr|480">🏀 Basketball 1hr — 480 kcal</option>
+      <option value="Soccer 1hr|520">⚽ Soccer 1hr — 520 kcal</option>
+    </select>
     <div style="display:flex;gap:8px;margin-bottom:12px">
-      <input type="text" id="exerciseName" placeholder="e.g. Running 30min" style="flex:1" />
-      <input type="number" id="exerciseCal" placeholder="kcal" style="width:80px" />
+      <input type="text" id="exerciseName" placeholder="Custom exercise name" style="flex:1" />
+      <input type="number" id="exerciseCal" placeholder="kcal" style="width:72px" />
     </div>
     <div class="edit-actions">
       <button class="edit-cancel" onclick="closeExerciseModal()">Done</button>
@@ -1201,7 +1223,7 @@ function showPage(p) {
     const now = new Date();
     calYear = now.getFullYear(); calMonth = now.getMonth();
     selectedDate = todayKey();
-    renderCalendar(); renderTrend(); renderDayDetail(selectedDate);
+    renderCalendar(); renderTrend(); renderDeficitTrend(); renderDayDetail(selectedDate);
   } else {
     render();
   }
@@ -1270,7 +1292,7 @@ function renderTrend() {
   const days = [];
   for (let i = 13; i >= 0; i--) {
     const d = new Date(); d.setDate(d.getDate() - i);
-    const key = localDateKey(d); // timezone-safe
+    const key = localDateKey(d);
     const total = getData(key).reduce((s,f) => s+f.cal, 0);
     days.push({ label: d.getDate(), total, key });
   }
@@ -1278,22 +1300,58 @@ function renderTrend() {
 
   days.forEach(day => {
     const col = document.createElement('div'); col.className = 'bar-col';
+    const val = document.createElement('div'); val.className = 'bar-val';
+    val.textContent = day.total > 0 ? day.total : '';
     const bar = document.createElement('div'); bar.className = 'bar-fill';
-    const h = day.total > 0 ? Math.max(4, Math.round(day.total / max * 64)) : 2;
+    const h = day.total > 0 ? Math.max(4, Math.round(day.total / max * 56)) : 2;
     bar.style.height = h + 'px';
     bar.style.background = day.total === 0 ? 'var(--surface3)'
       : day.total > goal ? '#ff6b6b'
       : day.total > goal * 0.8 ? '#ffd60a' : '#30d158';
-    bar.title = `${day.total} kcal`;
-    bar.onclick = () => {
-      if (selectedDate === day.key) {
-        jumpToDate(day.key);
-      } else {
-        selectedDate = day.key; renderCalendar(); renderDayDetail(day.key);
-      }
+    bar.onclick = col.onclick = () => {
+      selectedDate = day.key; renderCalendar(); renderDayDetail(day.key);
     };
     const lbl = document.createElement('div'); lbl.className = 'bar-x'; lbl.textContent = day.label;
-    col.appendChild(bar); col.appendChild(lbl);
+    col.appendChild(val); col.appendChild(bar); col.appendChild(lbl);
+    chart.appendChild(col);
+  });
+}
+
+function renderDeficitTrend() {
+  const chart = document.getElementById('deficitTrendChart');
+  if (!chart) return;
+  chart.innerHTML = '';
+  if (bmr === 0) {
+    chart.innerHTML = '<div style="font-size:13px;color:var(--muted);padding:8px 0">Set BMR on home screen to see deficit trend</div>';
+    return;
+  }
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = localDateKey(d);
+    const intake = getData(key).reduce((s,f) => s+f.cal, 0);
+    const exKey = 'exercises_' + key;
+    const exercise = JSON.parse(localStorage.getItem(exKey) || '[]').reduce((s,e) => s+e.cal, 0);
+    const deficit = intake > 0 ? bmr + exercise - intake : 0;
+    days.push({ label: d.getDate(), deficit, key });
+  }
+  const maxAbs = Math.max(...days.map(d => Math.abs(d.deficit)), 1);
+
+  days.forEach(day => {
+    const col = document.createElement('div'); col.className = 'bar-col';
+    const val = document.createElement('div'); val.className = 'bar-val';
+    val.textContent = day.deficit !== 0 ? Math.abs(day.deficit) : '';
+    val.style.color = day.deficit > 0 ? 'var(--green-dark)' : day.deficit < 0 ? 'var(--red)' : 'var(--muted)';
+    const bar = document.createElement('div'); bar.className = 'bar-fill';
+    const h = day.deficit !== 0 ? Math.max(4, Math.round(Math.abs(day.deficit) / maxAbs * 56)) : 2;
+    bar.style.height = h + 'px';
+    bar.style.background = day.deficit === 0 ? 'var(--surface3)'
+      : day.deficit > 0 ? '#30d158' : '#ff6b6b';
+    bar.onclick = col.onclick = () => {
+      selectedDate = day.key; renderCalendar(); renderDayDetail(day.key);
+    };
+    const lbl = document.createElement('div'); lbl.className = 'bar-x'; lbl.textContent = day.label;
+    col.appendChild(val); col.appendChild(bar); col.appendChild(lbl);
     chart.appendChild(col);
   });
 }
@@ -1527,7 +1585,13 @@ function renderExerciseList() {
   `).join('');
 }
 
-function addExercise() {
+function fillExercisePreset(val) {
+  if (!val) return;
+  const [name, cal] = val.split('|');
+  document.getElementById('exerciseName').value = name;
+  document.getElementById('exerciseCal').value = cal;
+  document.getElementById('exercisePreset').value = '';
+}
   const name = document.getElementById('exerciseName').value.trim();
   const cal = parseInt(document.getElementById('exerciseCal').value);
   if (!name || !cal) { showToast('Enter exercise name and calories'); return; }
