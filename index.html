@@ -358,6 +358,8 @@
       </button>
       <div class="user-dropdown" id="userDropdown">
         <div class="user-dropdown-name" id="userFullName"></div>
+        <div class="user-dropdown-item" onclick="openGoalPicker()">🎯 Calorie Goal</div>
+        <div class="user-dropdown-item" onclick="toggleUserDropdown();openSettings()">⚙️ API Settings</div>
         <div class="user-dropdown-item" onclick="handleSignOut()">↪ Sign out</div>
       </div>
     </div>
@@ -431,17 +433,9 @@
           <option value="dinner">🌙 Dinner</option>
           <option value="snack">🍪 Snack</option>
         </select>
-        <select id="goalSel" onchange="updateGoal(this.value)">
-          <option value="1500">Goal · 1500</option>
-          <option value="1800">Goal · 1800</option>
-          <option value="2000" selected>Goal · 2000</option>
-          <option value="2200">Goal · 2200</option>
-          <option value="2500">Goal · 2500</option>
-        </select>
       </div>
       <div class="btn-row">
         <button class="btn btn-primary" onclick="addFood()">Add</button>
-        <button class="btn" onclick="askAI()">Ask AI ↗</button>
       </div>
     </div>
   </div>
@@ -467,13 +461,32 @@
 </div>
 
 <!-- Settings sheet -->
-<!-- Describe modal -->
+<!-- Goal picker modal -->
+<div class="describe-overlay" id="goalOverlay" onclick="if(event.target===this)closeGoalPicker()">
+  <div class="describe-card">
+    <h3>Calorie Goal</h3>
+    <div style="display:flex;flex-direction:column;gap:8px;margin:12px 0">
+      <button id="goalOpt1200" onclick="updateGoal(1200);closeGoalPicker()" style="background:var(--surface2);border:none;border-radius:10px;padding:12px;color:var(--text);font-size:15px;font-family:inherit;cursor:pointer;text-align:left">1200 kcal</button>
+      <button id="goalOpt1500" onclick="updateGoal(1500);closeGoalPicker()" style="background:var(--surface2);border:none;border-radius:10px;padding:12px;color:var(--text);font-size:15px;font-family:inherit;cursor:pointer;text-align:left">1500 kcal</button>
+      <button id="goalOpt1800" onclick="updateGoal(1800);closeGoalPicker()" style="background:var(--surface2);border:none;border-radius:10px;padding:12px;color:var(--text);font-size:15px;font-family:inherit;cursor:pointer;text-align:left">1800 kcal</button>
+      <button id="goalOpt2000" onclick="updateGoal(2000);closeGoalPicker()" style="background:var(--surface2);border:none;border-radius:10px;padding:12px;color:var(--text);font-size:15px;font-family:inherit;cursor:pointer;text-align:left">2000 kcal</button>
+      <button id="goalOpt2200" onclick="updateGoal(2200);closeGoalPicker()" style="background:var(--surface2);border:none;border-radius:10px;padding:12px;color:var(--text);font-size:15px;font-family:inherit;cursor:pointer;text-align:left">2200 kcal</button>
+      <button id="goalOpt2500" onclick="updateGoal(2500);closeGoalPicker()" style="background:var(--surface2);border:none;border-radius:10px;padding:12px;color:var(--text);font-size:15px;font-family:inherit;cursor:pointer;text-align:left">2500 kcal</button>
+      <button id="goalOpt3000" onclick="updateGoal(3000);closeGoalPicker()" style="background:var(--surface2);border:none;border-radius:10px;padding:12px;color:var(--text);font-size:15px;font-family:inherit;cursor:pointer;text-align:left">3000 kcal</button>
+    </div>
+    <button style="width:100%;padding:12px;border:none;border-radius:10px;font-size:15px;cursor:pointer;font-family:inherit;background:var(--surface2);color:var(--text)" onclick="closeGoalPicker()">Cancel</button>
+  </div>
+</div>
+
+<!-- Describe modal (used for text describe AND photo context) -->
 <div class="describe-overlay" id="describeOverlay" onclick="closeDescribeIfBg(event)">
   <div class="describe-card">
-    <h3>Describe your meal</h3>
-    <textarea id="describeInput" placeholder="e.g. a bowl of ramen with egg and pork, large size"></textarea>
+    <h3 id="describeTitle">Describe your meal</h3>
+    <p id="describeHint" style="font-size:13px;color:var(--muted);margin:0 0 10px"></p>
+    <textarea id="describeInput" placeholder="e.g. large portion, with extra cheese, no sauce..."></textarea>
     <div class="edit-actions" style="margin-top:12px">
-      <button class="edit-cancel" onclick="closeDescribe()">Cancel</button>
+      <button class="edit-cancel" id="describeSkipBtn" style="display:none" onclick="skipDescribe()">Skip</button>
+      <button class="edit-cancel" id="describeCancelBtn" onclick="closeDescribe()">Cancel</button>
       <button class="edit-save" id="describeSubmitBtn" onclick="submitDescribe()">Estimate →</button>
     </div>
   </div>
@@ -957,18 +970,58 @@ function saveEdit() {
   showToast('Updated');
 }
 
+// ── Goal picker ───────────────────────────────────────────────────────────────
+function openGoalPicker() {
+  [1200,1500,1800,2000,2200,2500,3000].forEach(v => {
+    const btn = document.getElementById('goalOpt' + v);
+    if (btn) btn.style.background = v === goal ? 'var(--blue)' : 'var(--surface2)';
+    if (btn) btn.style.color = v === goal ? 'white' : 'var(--text)';
+  });
+  document.getElementById('goalOverlay').classList.add('open');
+}
+function closeGoalPicker() { document.getElementById('goalOverlay').classList.remove('open'); }
+
 // ── Describe modal ────────────────────────────────────────────────────────────
+let _pendingPhotoData = null;
+
 function openDescribe() {
+  _pendingPhotoData = null;
+  document.getElementById('describeTitle').textContent = 'Describe your meal';
+  document.getElementById('describeHint').textContent = '';
+  document.getElementById('describeSkipBtn').style.display = 'none';
+  document.getElementById('describeCancelBtn').style.display = '';
   document.getElementById('describeInput').value = '';
+  document.getElementById('describeInput').placeholder = 'e.g. a bowl of ramen with egg and pork, large size';
   document.getElementById('describeOverlay').classList.add('open');
   setTimeout(() => document.getElementById('describeInput').focus(), 100);
 }
-function closeDescribe() { document.getElementById('describeOverlay').classList.remove('open'); }
+
+function openDescribeAfterPhoto(base64, mediaType) {
+  _pendingPhotoData = { base64, mediaType };
+  document.getElementById('describeTitle').textContent = 'Add context (optional)';
+  document.getElementById('describeHint').textContent = 'Help AI estimate more accurately — describe portion size, ingredients, cooking method, etc.';
+  document.getElementById('describeSkipBtn').style.display = '';
+  document.getElementById('describeCancelBtn').style.display = 'none';
+  document.getElementById('describeInput').value = '';
+  document.getElementById('describeInput').placeholder = 'e.g. large portion, extra cheese, grilled not fried...';
+  document.getElementById('describeOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('describeInput').focus(), 100);
+}
+
+function closeDescribe() {
+  document.getElementById('describeOverlay').classList.remove('open');
+  _pendingPhotoData = null;
+}
 function closeDescribeIfBg(e) { if (e.target === document.getElementById('describeOverlay')) closeDescribe(); }
+
+async function skipDescribe() {
+  const photoData = _pendingPhotoData;
+  closeDescribe();
+  if (photoData) await analyzePhoto(photoData.base64, photoData.mediaType, '');
+}
 
 async function submitDescribe() {
   const text = document.getElementById('describeInput').value.trim();
-  if (!text) { showToast('Please describe your meal'); return; }
   const apiKey = localStorage.getItem('openrouterKey');
   if (!apiKey) { openSettings(); showToast('Set your OpenRouter API key first'); return; }
 
@@ -977,22 +1030,31 @@ async function submitDescribe() {
   btn.disabled = true;
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: 'openrouter/free',
-        messages: [{ role: 'user', content: `Estimate calories for: "${text}". Group by dish. Return only raw JSON, no markdown: {"items":[{"name":"dish name","cal":total_integer_kcal,"emoji":"single emoji","components":[{"name":"component name","cal":integer_kcal,"emoji":"single emoji"}]}]}. If only one food with no sub-components, leave components as empty array.` }]
-      })
-    });
-    const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
-    const raw = (data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim();
-    const parsed = JSON.parse(raw);
-    if (parsed.items?.length) {
+    if (_pendingPhotoData) {
+      // Photo + description mode
+      const photoData = _pendingPhotoData;
       closeDescribe();
-      showPreview(parsed.items);
-    } else { showToast('Could not estimate — try being more specific'); }
+      await analyzePhoto(photoData.base64, photoData.mediaType, text);
+    } else {
+      // Text-only mode
+      if (!text) { showToast('Please describe your meal'); btn.textContent = 'Estimate →'; btn.disabled = false; return; }
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: 'openrouter/free',
+          messages: [{ role: 'user', content: `Estimate calories for: "${text}". Group by dish. Return ONLY raw JSON, no markdown: {"items":[{"name":"dish name","cal":total_kcal_integer,"emoji":"emoji","components":[{"name":"component","cal":kcal_integer,"emoji":"emoji"}]}]}. Use empty array for components if no sub-parts.` }]
+        })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+      const raw = (data.choices?.[0]?.message?.content || '').replace(/```json|```/g, '').trim();
+      const parsed = JSON.parse(raw);
+      if (parsed.items?.length) {
+        closeDescribe();
+        showPreview(parsed.items);
+      } else { showToast('Could not estimate — try being more specific'); }
+    }
   } catch(e) {
     console.error(e);
     showToast((e.message || 'Failed to estimate').slice(0, 100));
@@ -1356,12 +1418,10 @@ function closeCamera() {
 async function snapPhoto() {
   const video = document.getElementById('cameraStream');
 
-  // Get dimensions - fall back to video element size if videoWidth is 0
   const w = video.videoWidth || video.offsetWidth || 640;
   const h = video.videoHeight || video.offsetHeight || 480;
 
   const canvas = document.createElement('canvas');
-  // Resize to max 1024px to keep payload small
   const MAX = 1024;
   let cw = w, ch = h;
   if (cw > MAX || ch > MAX) {
@@ -1372,7 +1432,6 @@ async function snapPhoto() {
   canvas.height = ch;
   canvas.getContext('2d').drawImage(video, 0, 0, cw, ch);
 
-  // Get base64 BEFORE closing camera
   let base64;
   try {
     const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
@@ -1382,12 +1441,20 @@ async function snapPhoto() {
     return;
   }
   if (!base64 || base64.length < 100) {
-    showToast(`Image too small (${base64?.length || 0}) — try again`);
+    showToast(`Image too small — try again`);
     return;
   }
 
   closeCamera();
 
+  const apiKey = localStorage.getItem('openrouterKey');
+  if (!apiKey) { openSettings(); showToast('Set your OpenRouter API key first'); return; }
+
+  // Open describe modal for optional context before analysis
+  openDescribeAfterPhoto(base64, 'image/jpeg');
+}
+
+async function analyzePhoto(base64, mediaType, description) {
   const apiKey = localStorage.getItem('openrouterKey');
   if (!apiKey) { openSettings(); showToast('Set your OpenRouter API key first'); return; }
 
@@ -1399,12 +1466,11 @@ async function snapPhoto() {
     const res = await fetch('/api/recognize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey, base64, mediaType: 'image/jpeg' })
+      body: JSON.stringify({ apiKey, base64, mediaType, description })
     });
     const parsed = await res.json();
     if (!res.ok) throw new Error(parsed.error || 'Server error');
     if (parsed.items?.length) {
-      closeCamera();
       showPreview(parsed.items);
     } else { showToast('No food detected — try again'); }
   } catch(e) {
@@ -1415,6 +1481,7 @@ async function snapPhoto() {
     document.getElementById('cameraBtn').disabled = false;
     document.getElementById('describeBtn').disabled = false;
   }
+}
 }
 
 // ── Toast ─────────────────────────────────────────────────────────────────────

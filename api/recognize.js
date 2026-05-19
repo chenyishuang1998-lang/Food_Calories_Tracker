@@ -7,9 +7,12 @@ export const config = {
   },
 };
 
-const PROMPT = 'Identify all foods in this image. Group into dishes. Return ONLY raw JSON, no markdown, no explanation: {"items":[{"name":"dish name","cal":total_kcal_integer,"emoji":"emoji","components":[{"name":"component","cal":kcal_integer,"emoji":"emoji"}]}]}. Each top-level item is one dish. Components are its ingredients/parts. If a dish has no sub-parts, use empty array for components. Never return flat ungrouped items.';
+const BASE_PROMPT = 'Identify all foods in this image. Group into dishes. Return ONLY raw JSON, no markdown, no explanation: {"items":[{"name":"dish name","cal":total_kcal_integer,"emoji":"emoji","components":[{"name":"component","cal":kcal_integer,"emoji":"emoji"}]}]}. Each top-level item is one dish. Components are its ingredients/parts. If a dish has no sub-parts, use empty array for components. Never return flat ungrouped items.';
 
-async function recognize(apiKey, base64, mediaType) {
+async function recognize(apiKey, base64, mediaType, description) {
+  const prompt = description
+    ? `${BASE_PROMPT} Additional context from user: "${description}". Use this to improve accuracy.`
+    : BASE_PROMPT;
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -20,7 +23,7 @@ async function recognize(apiKey, base64, mediaType) {
       model: 'openrouter/free',
       messages: [{ role: 'user', content: [
         { type: 'image_url', image_url: { url: `data:${mediaType || 'image/jpeg'};base64,${base64}` } },
-        { type: 'text', text: PROMPT }
+        { type: 'text', text: prompt }
       ]}]
     })
   });
@@ -70,14 +73,14 @@ export default async function handler(req, res) {
         req.on('end', () => { try { resolve(JSON.parse(data)); } catch(e) { reject(e); } });
         req.on('error', reject);
       });
-      ({ apiKey, base64, mediaType } = body);
+      ({ apiKey, base64, mediaType, description } = body);
     }
 
     if (!apiKey || !base64) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const text = await recognize(apiKey, base64, mediaType);
+    const text = await recognize(apiKey, base64, mediaType, description || '');
     const parsed = JSON.parse(text);
     return res.status(200).json(parsed);
 
