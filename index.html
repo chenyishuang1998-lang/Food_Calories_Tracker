@@ -548,13 +548,14 @@ async function initAuth() {
   let _synced = false;
   _supa.auth.onAuthStateChange(async (event, session) => {
     console.log('[auth] event:', event, 'session:', !!session);
+    if (event === 'INITIAL_SESSION') return;
     if (session) {
       setUser(session.user);
       if (event === 'SIGNED_IN' && !_synced) {
         _synced = true;
         await syncFromCloud();
+        showApp();
       }
-      showApp();
     } else {
       _synced = false;
       setUser(null);
@@ -565,6 +566,15 @@ async function initAuth() {
       }
     }
   });
+  const { data: { session } } = await _supa.auth.getSession();
+  if (session) {
+    setUser(session.user);
+    showApp();
+  } else if (localStorage.getItem('skippedLogin')) {
+    showApp();
+  } else {
+    showLoginPage();
+  }
 }
 
 function setUser(user) {
