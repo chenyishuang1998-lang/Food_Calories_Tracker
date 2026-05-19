@@ -7,7 +7,7 @@ export const config = {
   },
 };
 
-const PROMPT = 'Identify all foods in this image. Group them by dish. Return only raw JSON, no markdown: {"items":[{"name":"dish name","cal":total_integer_kcal,"emoji":"single emoji","components":[{"name":"component name","cal":integer_kcal,"emoji":"single emoji"}]}]}. If a dish has only one component, leave components as empty array. Estimate kcal for visible portions.';
+const PROMPT = 'Identify all foods in this image. Group into dishes. Return ONLY raw JSON, no markdown, no explanation: {"items":[{"name":"dish name","cal":total_kcal_integer,"emoji":"emoji","components":[{"name":"component","cal":kcal_integer,"emoji":"emoji"}]}]}. Each top-level item is one dish. Components are its ingredients/parts. If a dish has no sub-parts, use empty array for components. Never return flat ungrouped items.';
 
 async function recognize(apiKey, base64, mediaType) {
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {

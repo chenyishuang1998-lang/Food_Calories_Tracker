@@ -1007,7 +1007,14 @@ let _previewItems = [];
 
 function showPreview(items) {
   const meal = document.getElementById('mealType').value;
-  _previewItems = items.map(item => ({ ...item, meal, emoji: item.emoji || getEmoji(item.name) }));
+  // Normalize: if items have no components field, treat each as a standalone dish
+  _previewItems = items.map(item => ({
+    ...item,
+    meal,
+    emoji: item.emoji || getEmoji(item.name),
+    components: item.components || [],
+    _expanded: false
+  }));
   renderPreview();
   document.getElementById('previewOverlay').classList.add('open');
 }
