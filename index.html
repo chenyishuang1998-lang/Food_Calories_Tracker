@@ -73,9 +73,10 @@
     .describe-card textarea::placeholder { color:var(--muted); }
     .preview-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:200; align-items:flex-end; justify-content:center; }
     .preview-overlay.open { display:flex; }
-    .preview-card { background:#fff; border-radius:var(--r-lg) var(--r-lg) 0 0; padding:20px 20px calc(env(safe-area-inset-bottom)+20px); width:100%; max-width:480px; max-height:80vh; overflow-y:auto; box-shadow:0 -4px 30px rgba(0,0,0,.1); }
+    .preview-card { background:#fff; border-radius:var(--r-lg) var(--r-lg) 0 0; padding:24px 24px calc(env(safe-area-inset-bottom)+32px); width:100%; max-width:480px; max-height:85vh; overflow-y:auto; box-shadow:0 -4px 30px rgba(0,0,0,.12); }
+    .preview-handle { width:36px; height:4px; background:var(--surface3); border-radius:99px; margin:0 auto 20px; }
     .preview-card h3 { margin:0 0 16px; font-size:17px; font-weight:600; }
-    .preview-item { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:0.5px solid var(--border); }
+    .preview-item { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:0.5px solid var(--border); }
     .preview-item:last-child { border-bottom:none; }
     .preview-emoji { font-size:24px; width:32px; text-align:center; }
     .preview-fields { flex:1; display:flex; flex-direction:column; gap:6px; }
@@ -485,11 +486,12 @@
 <!-- Result preview modal -->
 <div class="preview-overlay" id="previewOverlay" onclick="closePreviewIfBg(event)">
   <div class="preview-card">
+    <div class="preview-handle"></div>
     <h3>Review before adding</h3>
     <div id="previewItems"></div>
-    <div class="edit-actions" style="margin-top:16px">
-      <button class="edit-cancel" onclick="closePreview()">Cancel</button>
-      <button class="edit-save" onclick="confirmPreview()">Add to log</button>
+    <div style="display:flex;gap:8px;margin-top:20px">
+      <button onclick="closePreview()" style="flex:1;padding:13px;border:none;border-radius:var(--r);font-size:15px;font-weight:500;cursor:pointer;font-family:inherit;background:var(--surface2);color:var(--text2)">Cancel</button>
+      <button onclick="confirmPreview()" style="flex:2;padding:13px;border:none;border-radius:var(--r);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--blue);color:#fff">Add to log</button>
     </div>
   </div>
 </div>
