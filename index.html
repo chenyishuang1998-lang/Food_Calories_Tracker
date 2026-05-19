@@ -1592,6 +1592,8 @@ function fillExercisePreset(val) {
   document.getElementById('exerciseCal').value = cal;
   document.getElementById('exercisePreset').value = '';
 }
+
+function addExercise() {
   const name = document.getElementById('exerciseName').value.trim();
   const cal = parseInt(document.getElementById('exerciseCal').value);
   if (!name || !cal) { showToast('Enter exercise name and calories'); return; }
