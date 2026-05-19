@@ -81,7 +81,13 @@ export default async function handler(req, res) {
     }
 
     const text = await recognize(apiKey, base64, mediaType, description || '');
-    const parsed = JSON.parse(text);
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch(parseErr) {
+      console.error('AI returned non-JSON:', text?.slice(0, 200));
+      return res.status(500).json({ error: 'AI returned an unexpected response — please try again' });
+    }
     return res.status(200).json(parsed);
 
   } catch (e) {
