@@ -683,6 +683,7 @@ async function handleSignOut() {
   if (dot?.classList.contains('syncing')) showToast('Syncing… please wait');
   await _pendingSync;
   await _supa.auth.signOut();
+  _syncedFromCloud = false;
   setUser(null);
   localStorage.removeItem('skippedLogin');
   Object.keys(localStorage).forEach(k => {
@@ -726,8 +727,11 @@ async function syncToCloud(dateKey, data) {
   return _pendingSync;
 }
 
+let _syncedFromCloud = false;
 async function syncFromCloud() {
   if (!_user) return;
+  if (_syncedFromCloud) { console.log('[sync] already synced, skip'); return; }
+  _syncedFromCloud = true;
   try {
     const { data: rows } = await _supa.from('food_logs')
       .select('*')
