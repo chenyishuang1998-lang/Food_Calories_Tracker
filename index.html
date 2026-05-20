@@ -1581,18 +1581,17 @@ async function saveBmr(val, h, w, a, s) {
   bmr = val;
   localStorage.setItem(getBmrKey(dateKey), JSON.stringify(profile));
   updateDeficit();
-  // Sync to cloud
   if (_user) {
     try {
-      await _supa.from('user_profiles').upsert({
+      await _supa.from('body_logs').upsert({
         user_id: _user.id,
+        date: dateKey,
         bmr: val,
         height: h || null,
         weight: w || null,
         age: a || null,
-        sex: s || null,
-        updated_at: new Date().toISOString()
-      });
+        sex: s || null
+      }, { onConflict: 'user_id,date' });
     } catch(e) { console.error('BMR sync error:', e); }
   }
 }
@@ -1614,14 +1613,20 @@ async function syncExerciseToCloud(dateKey) {
 async function syncProfileFromCloud() {
   if (!_user) return;
   try {
-    const { data } = await _supa.from('user_profiles').select('*').eq('user_id', _user.id).single();
-    if (data && data.bmr) {
-      // Store as today's profile if no local data exists
-      const todayKey2 = todayKey();
-      if (!localStorage.getItem(getBmrKey(todayKey2))) {
-        const profile = { bmr: data.bmr, height: data.height, weight: data.weight, age: data.age, sex: data.sex };
-        localStorage.setItem(getBmrKey(todayKey2), JSON.stringify(profile));
-      }
+    const { data } = await _supa.from('body_logs')
+      .select('*')
+      .eq('user_id', _user.id)
+      .order('date', { ascending: true });
+    if (data?.length) {
+      data.forEach(row => {
+        const key = getBmrKey(row.date);
+        if (!localStorage.getItem(key)) {
+          localStorage.setItem(key, JSON.stringify({
+            bmr: row.bmr, height: row.height,
+            weight: row.weight, age: row.age, sex: row.sex
+          }));
+        }
+      });
       loadBmrForCurrentDate();
     }
   } catch(e) { console.error('Profile sync error:', e); }
