@@ -73,7 +73,7 @@
     .describe-card textarea::placeholder { color:var(--muted); }
     .preview-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:200; align-items:flex-end; justify-content:center; }
     .preview-overlay.open { display:flex; }
-    .preview-card { background:#fff; border-radius:var(--r-lg) var(--r-lg) 0 0; padding:24px 24px calc(env(safe-area-inset-bottom)+32px); width:100%; max-width:480px; max-height:85vh; overflow-y:auto; box-shadow:0 -4px 30px rgba(0,0,0,.12); }
+    .preview-card { background:#fff; border-radius:var(--r-lg) var(--r-lg) 0 0; padding:20px 32px calc(env(safe-area-inset-bottom)+48px); width:100%; max-width:480px; max-height:85vh; overflow-y:auto; box-shadow:0 -4px 30px rgba(0,0,0,.12); }
     .preview-handle { width:36px; height:4px; background:var(--surface3); border-radius:99px; margin:0 auto 20px; }
     .preview-card h3 { margin:0 0 16px; font-size:17px; font-weight:600; }
     .preview-item { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:0.5px solid var(--border); }
@@ -1127,12 +1127,12 @@ function renderPreview() {
         </div>
       </div>
       ${item.components?.length && item._expanded ? `
-        <div style="margin:0 16px;background:var(--surface2);border-radius:var(--r-sm);padding:8px 12px;display:flex;flex-direction:column;gap:8px">
+        <div style="margin:8px 0 0;background:var(--surface2);border-radius:var(--r-sm);padding:8px 12px;display:flex;flex-direction:column;gap:8px">
           ${item.components.map((c, j) => `
-            <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:15px;width:22px;text-align:center">${c.emoji}</span>
-              <span style="flex:1;font-size:14px;color:var(--text)">${c.name}</span>
-              <span style="font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums">${c.cal} kcal</span>
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+              <span style="font-size:15px;width:22px;flex-shrink:0;text-align:center">${c.emoji}</span>
+              <span style="flex:1;font-size:13px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.name}</span>
+              <span style="font-size:13px;color:var(--muted);flex-shrink:0">${c.cal} kcal</span>
             </div>
           `).join('')}
         </div>
