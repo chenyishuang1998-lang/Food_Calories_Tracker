@@ -73,9 +73,9 @@
     .describe-card textarea::placeholder { color:var(--muted); }
     .preview-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:200; align-items:flex-end; justify-content:center; }
     .preview-overlay.open { display:flex; }
-    .preview-card { background:#fff; border-radius:var(--r-lg) var(--r-lg) 0 0; padding:24px 24px 0; width:100%; max-width:480px; max-height:85vh; overflow-y:auto; box-shadow:0 -4px 30px rgba(0,0,0,.12); }
-    .preview-handle { width:36px; height:4px; background:var(--surface3); border-radius:99px; margin:0 auto 20px; }
-    .preview-card h3 { margin:0 0 16px; font-size:17px; font-weight:600; }
+    .preview-card { background:#fff; border-radius:var(--r-lg) var(--r-lg) 0 0; padding:16px 24px 0; width:100%; max-width:480px; max-height:85vh; overflow-y:auto; box-shadow:0 -4px 30px rgba(0,0,0,.12); }
+    .preview-handle { width:36px; height:4px; background:var(--surface3); border-radius:99px; margin:0 auto 16px; }
+    .preview-card h3 { margin:0 0 12px; font-size:17px; font-weight:600; }
     .preview-item { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:0.5px solid var(--border); }
     .preview-item:last-child { border-bottom:none; }
     .preview-emoji { font-size:24px; width:32px; text-align:center; }
@@ -176,7 +176,7 @@
     .sync-dot { width:7px; height:7px; border-radius:50%; background:var(--green); display:inline-block; margin-left:2px; }
     .sync-dot.syncing { background:var(--amber); animation:pulse 1s infinite; }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
-    .toast { position:fixed; bottom:calc(env(safe-area-inset-bottom)+160px); left:50%; transform:translateX(-50%); background:rgba(50,50,52,0.92); color:#fff; padding:10px 18px; border-radius:99px; font-size:14px; font-weight:500; white-space:nowrap; z-index:999; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); animation:toastIn 0.2s ease; }
+    .toast { position:fixed; bottom:180px; left:50%; transform:translateX(-50%); background:rgba(50,50,52,0.92); color:#fff; padding:10px 18px; border-radius:99px; font-size:14px; font-weight:500; white-space:nowrap; z-index:999; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); animation:toastIn 0.2s ease; }
     @keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
     .spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(0,122,255,0.3); border-top-color:var(--blue); border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:-2px; }
     @keyframes spin { to { transform:rotate(360deg); } }
@@ -487,9 +487,9 @@
 <div class="preview-overlay" id="previewOverlay" onclick="closePreviewIfBg(event)">
   <div class="preview-card">
     <div class="preview-handle"></div>
-    <h3 style="padding:0 4px 16px">Review before adding</h3>
-    <div id="previewItems" style="padding:0 4px"></div>
-    <div style="display:flex;gap:8px;margin-top:20px;padding:0 4px 4px;padding-bottom:calc(env(safe-area-inset-bottom)+24px)">
+    <h3>Review before adding</h3>
+    <div id="previewItems" style="padding:0 2px"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;padding-bottom:32px">
       <button onclick="closePreview()" style="flex:1;padding:14px;border:none;border-radius:var(--r);font-size:15px;font-weight:500;cursor:pointer;font-family:inherit;background:var(--surface2);color:var(--text2)">Cancel</button>
       <button onclick="confirmPreview()" style="flex:2;padding:14px;border:none;border-radius:var(--r);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--blue);color:#fff">Add to log</button>
     </div>
