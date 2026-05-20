@@ -738,25 +738,24 @@ async function syncFromCloud() {
       .eq('user_id', _user.id)
       .order('created_at', { ascending: true });
 
-    // Clear existing local food data before writing cloud data
-    Object.keys(localStorage).forEach(k => {
-      if (/^\d{4}-\d{2}-\d{2}$/.test(k)) localStorage.removeItem(k);
-    });
+    if (rows?.length) {
+      // Group cloud data by date
+      const byDate = {};
+      rows.forEach(r => {
+        if (!byDate[r.date]) byDate[r.date] = [];
+        byDate[r.date].push({ id: r.id, name: r.name, cal: r.cal, meal: r.meal, emoji: r.emoji });
+      });
+      // Only write cloud data for dates with NO local data
+      // Local data is always more recent and takes priority
+      Object.entries(byDate).forEach(([date, items]) => {
+        if (!localStorage.getItem(date)) {
+          localStorage.setItem(date, JSON.stringify(items));
+        }
+      });
+    }
 
-    if (!rows?.length) { render(); return; }
-
-    // Group by date and save to localStorage
-    const byDate = {};
-    rows.forEach(r => {
-      if (!byDate[r.date]) byDate[r.date] = [];
-      byDate[r.date].push({ id: Date.now() + Math.random(), name: r.name, cal: r.cal, meal: r.meal, emoji: r.emoji });
-    });
-    Object.entries(byDate).forEach(([date, items]) => {
-      localStorage.setItem(date, JSON.stringify(items));
-    });
     render();
     showToast('Data synced from cloud');
-    // Also sync profile (BMR) and today's exercises
     await syncProfileFromCloud();
     await syncExercisesFromCloud(todayKey());
     updateDeficit();
