@@ -821,7 +821,7 @@ const EMOJI_MAP = {
 
 let offset = 0;
 let goal = parseInt(localStorage.getItem('calGoal') || '2000');
-let openMeals = { breakfast:true, lunch:true, dinner:true, snack:false };
+let openMeals = {};
 let currentPage = 'tracker';
 let calYear, calMonth, selectedDate;
 
@@ -890,7 +890,9 @@ function render() {
   MEALS.forEach(({ key:mkey, label, color }) => {
     const items = data.filter(f => f.meal === mkey);
     const sub = items.reduce((s,f) => s + f.cal, 0);
-    const isOpen = openMeals[mkey];
+    // Auto-collapse if no items and user hasn't manually opened it
+    if (items.length === 0 && openMeals[mkey] === undefined) openMeals[mkey] = false;
+    const isOpen = items.length > 0 ? (openMeals[mkey] !== false) : (openMeals[mkey] === true);
     const sec = document.createElement('div');
     sec.className = 'meal-section';
     sec.innerHTML = `
