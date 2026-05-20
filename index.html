@@ -73,7 +73,7 @@
     .describe-card textarea::placeholder { color:var(--muted); }
     .preview-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:200; align-items:flex-end; justify-content:center; }
     .preview-overlay.open { display:flex; }
-    .preview-card { background:#fff; border-radius:var(--r-lg) var(--r-lg) 0 0; padding:24px 28px calc(env(safe-area-inset-bottom)+72px); width:100%; max-width:480px; max-height:85vh; overflow-y:auto; box-shadow:0 -4px 30px rgba(0,0,0,.12); }
+    .preview-card { background:#fff; border-radius:var(--r-lg) var(--r-lg) 0 0; padding:24px 24px 0; width:100%; max-width:480px; max-height:85vh; overflow-y:auto; box-shadow:0 -4px 30px rgba(0,0,0,.12); }
     .preview-handle { width:36px; height:4px; background:var(--surface3); border-radius:99px; margin:0 auto 20px; }
     .preview-card h3 { margin:0 0 16px; font-size:17px; font-weight:600; }
     .preview-item { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:0.5px solid var(--border); }
@@ -487,11 +487,11 @@
 <div class="preview-overlay" id="previewOverlay" onclick="closePreviewIfBg(event)">
   <div class="preview-card">
     <div class="preview-handle"></div>
-    <h3>Review before adding</h3>
-    <div id="previewItems"></div>
-    <div style="display:flex;gap:8px;margin-top:20px">
-      <button onclick="closePreview()" style="flex:1;padding:13px;border:none;border-radius:var(--r);font-size:15px;font-weight:500;cursor:pointer;font-family:inherit;background:var(--surface2);color:var(--text2)">Cancel</button>
-      <button onclick="confirmPreview()" style="flex:2;padding:13px;border:none;border-radius:var(--r);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--blue);color:#fff">Add to log</button>
+    <h3 style="padding:0 4px 16px">Review before adding</h3>
+    <div id="previewItems" style="padding:0 4px"></div>
+    <div style="display:flex;gap:8px;margin-top:20px;padding:0 4px 4px;padding-bottom:calc(env(safe-area-inset-bottom)+24px)">
+      <button onclick="closePreview()" style="flex:1;padding:14px;border:none;border-radius:var(--r);font-size:15px;font-weight:500;cursor:pointer;font-family:inherit;background:var(--surface2);color:var(--text2)">Cancel</button>
+      <button onclick="confirmPreview()" style="flex:2;padding:14px;border:none;border-radius:var(--r);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;background:var(--blue);color:#fff">Add to log</button>
     </div>
   </div>
 </div>
