@@ -176,7 +176,7 @@
     .sync-dot { width:7px; height:7px; border-radius:50%; background:var(--green); display:inline-block; margin-left:2px; }
     .sync-dot.syncing { background:var(--amber); animation:pulse 1s infinite; }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
-    .toast { position:fixed; bottom:calc(env(safe-area-inset-bottom)+24px); left:50%; transform:translateX(-50%); background:rgba(50,50,52,0.92); color:#fff; padding:10px 18px; border-radius:99px; font-size:14px; font-weight:500; white-space:nowrap; z-index:999; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); animation:toastIn 0.2s ease; }
+    .toast { position:fixed; bottom:calc(env(safe-area-inset-bottom)+100px); left:50%; transform:translateX(-50%); background:rgba(50,50,52,0.92); color:#fff; padding:10px 18px; border-radius:99px; font-size:14px; font-weight:500; white-space:nowrap; z-index:999; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); animation:toastIn 0.2s ease; }
     @keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
     .spinner { display:inline-block; width:14px; height:14px; border:2px solid rgba(0,122,255,0.3); border-top-color:var(--blue); border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:-2px; }
     @keyframes spin { to { transform:rotate(360deg); } }
@@ -1123,13 +1123,12 @@ function renderPreview() {
         </div>
       </div>
       ${item.components?.length && item._expanded ? `
-        <div style="margin-left:42px;border-left:2px solid var(--border);padding-left:12px;display:flex;flex-direction:column;gap:6px">
+        <div style="margin:0 16px;background:var(--surface2);border-radius:var(--r-sm);padding:8px 12px;display:flex;flex-direction:column;gap:8px">
           ${item.components.map((c, j) => `
             <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:16px">${c.emoji}</span>
-              <input type="text" value="${c.name}" oninput="_previewItems[${i}].components[${j}].name=this.value" style="flex:1;background:var(--surface2);border:none;border-radius:6px;padding:6px 8px;color:var(--text);font-size:13px;font-family:inherit" />
-              <input type="number" value="${c.cal}" oninput="_previewItems[${i}].components[${j}].cal=parseInt(this.value)||0" style="width:64px;background:var(--surface2);border:none;border-radius:6px;padding:6px 8px;color:var(--text);font-size:13px;font-family:inherit" />
-              <span style="font-size:12px;color:var(--muted)">kcal</span>
+              <span style="font-size:15px;width:22px;text-align:center">${c.emoji}</span>
+              <span style="flex:1;font-size:14px;color:var(--text)">${c.name}</span>
+              <span style="font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums">${c.cal} kcal</span>
             </div>
           `).join('')}
         </div>
